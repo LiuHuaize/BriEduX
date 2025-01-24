@@ -24,9 +24,9 @@ function Hero() {
   }, [titleNumber, titles])
 
   return (
-    <div className="w-full min-h-[calc(100vh-6rem)]">
+    <div className="w-full min-h-[calc(100vh-12rem)]">
       <div className="container mx-auto px-4">
-        <div className="flex gap-12 py-24 lg:py-36 items-center justify-center flex-col">
+        <div className="flex gap-12 py-16 lg:py-20 items-center justify-center flex-col">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -43,14 +43,14 @@ function Hero() {
                 <span>全新升级</span>
               </div>
             </motion.div>
-            <div className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl max-w-4xl tracking-tight text-center font-medium mt-6">
+            <div className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl max-w-5xl tracking-tight text-center font-light mt-8">
               <motion.div
-                className="flex items-center justify-center gap-4 flex-wrap"
+                className="flex items-center justify-center gap-4 flex-wrap leading-tight"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
-                <span>打造</span>
+                <span className="text-gray-800/80">打造</span>
                 <div className="relative h-[1.2em] w-[3em] inline-flex items-center justify-center overflow-hidden">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -64,19 +64,19 @@ function Hero() {
                       }}
                       className="absolute inset-0 flex items-center justify-center"
                     >
-                      <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900">
+                      <span className="font-normal bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800">
                         {titles[titleNumber]}型
                       </span>
                     </motion.div>
                   </AnimatePresence>
                 </div>
-                <span>求职体验</span>
+                <span className="text-gray-800/80">求职体验</span>
               </motion.div>
             </div>
           </motion.div>
 
           <motion.p 
-            className="text-lg sm:text-xl md:text-2xl leading-relaxed text-gray-600 max-w-3xl text-center"
+            className="text-lg sm:text-xl md:text-2xl leading-relaxed text-gray-600 max-w-3xl text-center mt-2"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
@@ -87,7 +87,7 @@ function Hero() {
           </motion.p>
 
           <motion.div 
-            className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full sm:w-auto justify-center items-center"
+            className="flex flex-col sm:flex-row gap-4 sm:gap-6 w-full sm:w-auto justify-center items-center mt-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
