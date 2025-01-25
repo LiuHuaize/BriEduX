@@ -35,7 +35,7 @@ export function NavBar({ items, className }: NavBarProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-0 sm:top-0 left-1/2 -translate-x-1/2 z-50 mb-6 sm:pt-8",
+        "fixed bottom-0 sm:top-0 left-1/2 -translate-x-1/2 z-50 mb-6 sm:pt-8 pointer-events-none",
         className,
       )}
     >
@@ -43,7 +43,7 @@ export function NavBar({ items, className }: NavBarProps) {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className="flex items-center gap-4 bg-white/5 border border-white/10 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg"
+        className="flex items-center gap-4 bg-white/5 border border-white/10 backdrop-blur-lg py-2 px-2 rounded-full shadow-lg pointer-events-auto"
       >
         {items.map((item) => {
           const isActive = pathname === item.url
@@ -53,6 +53,7 @@ export function NavBar({ items, className }: NavBarProps) {
               key={item.name}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              className="pointer-events-auto"
             >
               <Link
                 href={item.url}
