@@ -77,7 +77,7 @@ export default function Home() {
               className="flex flex-col sm:flex-row gap-4"
             >
               <Link 
-                href="/auth/register" 
+                href="/resume/create" 
                 className="inline-flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 开始使用
@@ -113,7 +113,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">打造简历</h3>
               <p className="text-gray-600">智能生成专业简历，突出个人优势，提高简历通过率</p>
-              <Link href="/auth/register" className="inline-flex items-center text-blue-600 mt-4 hover:text-blue-700">
+              <Link href="/resume/create" className="inline-flex items-center text-blue-600 mt-4 hover:text-blue-700">
                 开始制作 <ArrowRight className="ml-1 w-4 h-4" />
               </Link>
             </motion.div>

@@ -104,7 +104,7 @@ export default function ResumePage() {
               <Button
                 size="lg"
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
-                onClick={() => setStep(2)}
+                onClick={() => window.location.href = '/resume/create'}
               >
                 <Sparkles className="w-5 h-5 mr-2" />
                 开始使用
@@ -192,6 +192,7 @@ export default function ResumePage() {
         <Button
           size="lg"
           className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300"
+          onClick={() => window.location.href = '/resume/create'}
         >
           <Sparkles className="w-5 h-5 mr-2" />
           快速开始
