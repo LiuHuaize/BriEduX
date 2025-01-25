@@ -88,6 +88,21 @@ export default function ResumePage() {
             >
               使用 AI 技术，让你的简历脱颖而出
             </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-8"
+            >
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5"
+                onClick={() => setStep(2)}
+              >
+                <Sparkles className="w-5 h-5 mr-2" />
+                开始使用
+              </Button>
+            </motion.div>
           </div>
         </div>
       </div>
