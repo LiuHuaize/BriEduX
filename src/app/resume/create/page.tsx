@@ -70,6 +70,7 @@ export default function CreateResume() {
       {/* 聊天消息区域 - 使用absolute定位确保不会导致页面滚动 */}
       <div className="absolute inset-0 bottom-[80px] overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+          <div className="h-8" /> {/* 添加顶部间距 */}
           <AnimatePresence initial={false}>
             {messages.map((message) => (
               <motion.div
@@ -118,14 +119,14 @@ export default function CreateResume() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="输入你的问题..."
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all bg-gray-50"
+                className="w-full px-6 py-4 text-base text-gray-700 placeholder:text-gray-400 rounded-2xl border-[1.5px] border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all bg-white shadow-sm"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <Button
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 rounded-xl"
                 >
                   <Paperclip className="w-5 h-5" />
                 </Button>
@@ -133,7 +134,7 @@ export default function CreateResume() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 rounded-xl"
                 >
                   <ImageIcon className="w-5 h-5" />
                 </Button>
@@ -141,7 +142,7 @@ export default function CreateResume() {
                   type="button"
                   size="icon"
                   variant="ghost"
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 rounded-xl"
                 >
                   <Mic className="w-5 h-5" />
                 </Button>
@@ -149,7 +150,7 @@ export default function CreateResume() {
             </div>
             <Button 
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 py-3 flex items-center gap-2"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-base font-medium rounded-xl px-8 py-4 flex items-center gap-2 shadow-sm hover:shadow transition-all duration-200"
             >
               发送
               <Send className="w-4 h-4" />
