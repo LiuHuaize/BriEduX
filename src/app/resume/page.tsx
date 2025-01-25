@@ -10,9 +10,12 @@ import {
   ArrowRight,
   Mic,
   Settings,
-  CheckCircle
+  CheckCircle,
+  MessageCircle,
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function ResumePage() {
   const [step, setStep] = useState(1);
@@ -20,31 +23,35 @@ export default function ResumePage() {
   const steps = [
     {
       id: 1,
-      title: "上传已有简历",
-      description: "上传你现有的简历，AI 将帮助你优化",
-      icon: Upload,
-      color: "blue"
+      title: "对话式创建",
+      description: "像聊天一样轻松创建简历，AI助手会引导你挖掘亮点",
+      icon: MessageCircle,
+      color: "blue",
+      action: "开始对话"
     },
     {
       id: 2,
-      title: "创建新简历",
-      description: "从头开始创建一份全新的专业简历",
-      icon: FileText,
-      color: "indigo"
+      title: "匹配岗位经历",
+      description: "AI分析目标岗位要求，帮你发掘最匹配的经历和技能",
+      icon: Target,
+      color: "indigo",
+      action: "开始匹配"
     },
     {
       id: 3,
-      title: "AI 优化建议",
-      description: "获取 AI 针对性的优化建议",
+      title: "智能优化建议",
+      description: "获得针对性的简历优化建议，让简历更专业更有竞争力",
       icon: Sparkles,
-      color: "purple"
+      color: "purple",
+      action: "获取建议"
     },
     {
       id: 4,
-      title: "导出简历",
-      description: "导出优化后的专业简历",
-      icon: Download,
-      color: "green"
+      title: "一键生成简历",
+      description: "基于对话内容，自动生成精美的专业简历模板",
+      icon: FileText,
+      color: "green",
+      action: "立即生成"
     },
   ];
 
@@ -137,9 +144,7 @@ export default function ResumePage() {
           {steps.map((s, i) => (
             <motion.div
               key={s.id}
-              className={`group relative bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 ${
-                step === s.id ? 'ring-2 ring-blue-500 ring-offset-2' : ''
-              }`}
+              className="group relative bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100"
               onClick={() => setStep(s.id)}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -148,28 +153,29 @@ export default function ResumePage() {
             >
               <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <div className="relative p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center">
-                    <div className={`w-12 h-12 bg-${s.color}-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                      <s.icon className={`w-6 h-6 text-${s.color}-600`} />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 ml-4">{s.title}</h3>
+                <div className="flex items-center mb-6">
+                  <div className={cn(
+                    "w-10 h-10 backdrop-blur-sm rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300",
+                    {
+                      'bg-blue-100/50': s.color === 'blue',
+                      'bg-indigo-100/50': s.color === 'indigo',
+                      'bg-purple-100/50': s.color === 'purple',
+                      'bg-green-100/50': s.color === 'green'
+                    }
+                  )}>
+                    <s.icon className={cn(
+                      "w-5 h-5 stroke-[1.5]",
+                      {
+                        'text-blue-600': s.color === 'blue',
+                        'text-indigo-600': s.color === 'indigo',
+                        'text-purple-600': s.color === 'purple',
+                        'text-green-600': s.color === 'green'
+                      }
+                    )} />
                   </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ArrowRight className="w-5 h-5 text-gray-400" />
-                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 ml-3">{s.title}</h3>
                 </div>
                 <p className="text-gray-600">{s.description}</p>
-                {step === s.id && (
-                  <div className="mt-6 flex justify-end">
-                    <Button 
-                      size="lg"
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700"
-                    >
-                      开始制作
-                    </Button>
-                  </div>
-                )}
               </div>
             </motion.div>
           ))}
