@@ -2,12 +2,10 @@
 
 import { Hero } from "@/components/ui/animated-hero"
 
-function HeroDemo() {
+export function HeroDemo() {
   return (
     <div className="relative">
       <Hero />
     </div>
   )
-}
-
-export { HeroDemo } 
+} 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { MoveRight, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 function Hero() {
   const [titleNumber, setTitleNumber] = useState(0)
@@ -34,7 +35,7 @@ function Hero() {
             className="flex flex-col items-center gap-3"
           >
             <motion.div 
-              className="bg-blue-50 border border-blue-100 rounded-full px-4 py-2 shadow-sm"
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-full px-4 py-2 shadow-sm"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -64,7 +65,7 @@ function Hero() {
                       }}
                       className="absolute inset-0 flex items-center justify-center"
                     >
-                      <span className="font-normal bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800">
+                      <span className="font-normal bg-clip-text text-transparent bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600">
                         {titles[titleNumber]}型
                       </span>
                     </motion.div>
@@ -92,19 +93,23 @@ function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <Button 
-              size="lg" 
-              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto min-w-[160px] shadow-lg shadow-blue-200"
-            >
-              开始使用 <MoveRight className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              className="gap-2 w-full sm:w-auto min-w-[160px] border-2 hover:bg-gray-50"
-            >
-              了解更多 <MoveRight className="w-4 h-4" />
-            </Button>
+            <Link href="/resume">
+              <Button 
+                size="lg" 
+                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white w-full sm:w-auto min-w-[160px] shadow-lg shadow-blue-200/50"
+              >
+                开始使用 <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link href="/about">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-2 w-full sm:w-auto min-w-[160px] border-2 border-blue-200 hover:bg-blue-50 text-blue-600"
+              >
+                了解更多 <MoveRight className="w-4 h-4" />
+              </Button>
+            </Link>
           </motion.div>
         </div>
       </div>
