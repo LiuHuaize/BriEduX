@@ -66,10 +66,10 @@ export default function CreateResume() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* 聊天消息区域 */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-6">
+    <div className="fixed inset-0 flex flex-col bg-gray-50">
+      {/* 聊天消息区域 - 使用absolute定位确保不会导致页面滚动 */}
+      <div className="absolute inset-0 bottom-[80px] overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
           <AnimatePresence initial={false}>
             {messages.map((message) => (
               <motion.div
@@ -108,8 +108,8 @@ export default function CreateResume() {
         </div>
       </div>
 
-      {/* 输入区域 */}
-      <div className="border-t bg-white p-4">
+      {/* 输入区域 - 固定在底部 */}
+      <div className="absolute bottom-0 left-0 right-0 border-t bg-white p-4 h-[80px]">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto">
           <div className="flex items-center gap-4">
             <div className="flex-1 relative">
