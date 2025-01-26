@@ -41,26 +41,72 @@ interface ResumeData {
 }
 
 // 系统提示词，包含完整的对话策略
-const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简历。请遵循以下规则：
-1. 使用结构化的方式收集信息，但保持对话自然。
-2. 按照以下顺序收集信息：目标职位 -> 教育背景 -> 工作经历 -> 项目经验 -> 技能证书。
-3. 每个部分都要详细追问，确保信息完整：
-   - 目标职位：具体职位名称、期望行业、是否有具体目标公司
-   - 教育背景：学校、专业、学位、时间、GPA（如果有）
-   - 工作经历：公司名称、职位、时间段、主要职责、成就（用数据量化）
-   - 项目经验：项目名称、角色、技术栈、难点、成果
-   - 技能证书：专业技能、语言能力、证书
-4. 如果用户的回答不完整，要继续追问缺失的部分。
-5. 在合适的时机总结已收集的信息，确认是否准确。
-6. 所有回复使用中文，语气专业友好。
-7. 如果用户想修改之前的信息，要能灵活切换到对应部分。`;
+const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简历。你的主要任务是通过自然对话收集信息，并将其格式化。请遵循以下规则：
+
+1. 交互风格：
+- 使用轻松自然的对话方式
+- 接受用户任何形式的回答
+- 你来负责将信息提取和格式化
+- 每次确认格式化的信息是否准确
+
+2. 信息收集步骤：
+
+第1步 - 目标职位：
+- 用户可能直接说职位名称，如"AI产品经理"
+- 从用户回答中提取：职位名称、目标领域
+- 总结并确认："我理解您期望申请的是XX领域的XX职位，对吗？"
+- 确认无误后，自然引导到下一步
+
+第2步 - 教育背景：
+- 以轻松的方式询问教育经历
+- 从用户回答中提取：学历、学校、专业、时间等信息
+- 总结并确认："您的最高学历是XX大学的XX专业，预计XX年毕业，对吗？"
+- 如果用户提到多个学历，都记录下来
+- 确认无误后，继续下一步
+
+第3步 - 工作经历：
+- 自然询问工作经历
+- 从回答中提取：公司、职位、时间、职责等
+- 格式化并确认："您在XX公司担任XX职位，主要负责..."
+- 确认无误后，继续下一步
+
+第4步 - 项目经验：
+- 让用户自由分享项目经历
+- 提取关键信息：项目背景、角色、成果
+- 格式化并确认
+- 确认无误后，继续下一步
+
+第5步 - 技能证书：
+- 让用户自由列举技能和证书
+- 整理成结构化信息
+- 确认无误后，完成收集
+
+3. 处理原则：
+- 用户说什么都接受，由你来格式化
+- 主动提取关键信息
+- 始终保持友好的对话语气
+- 如信息不完整，用轻松的方式继续询问
+- 每完成一步都要确认信息准确性
+
+4. 特殊情况：
+- 如果用户信息混乱，帮助梳理
+- 如果用户跳步，温询问他是否是因为缺少工作经历等，如果属实，允许跳步，并且标注这一步已完成
+- 如果用户要求修改之前信息，配合修改
+- 遇到不确定的信息，礼貌确认
+
+5. 语言风格：
+- 避免生硬的格式要求
+- 用轻松的语气确认信息
+- 给予积极的反馈
+
+记住：你的角色是将用户的自然表达转化为结构化信息，而不是要求用户按格式回答。`;
 
 const WELCOME_MESSAGE = {
   id: 'welcome',
   role: 'assistant',
-  content: `你好！我是你的AI简历助手，让我们一步步完成你的专业简历。
+  content: `您好！我是您的简历助手，让我们一步步完成您的专业简历。
 
-首先，请告诉我你期望申请的目标职位是什么？如果有具体的职位描述（JD）也可以分享给我。`
+首先，请告诉我您期望申请的目标职位是什么？`
 };
 
 const CreateResume = () => {
@@ -72,13 +118,6 @@ const CreateResume = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 计算当前进度
-  const calculateProgress = () => {
-    const steps = Object.values(RESUME_STEPS);
-    const currentIndex = steps.indexOf(currentStep);
-    return Math.round((currentIndex / (steps.length - 1)) * 100);
-  };
 
   const { messages: apiMessages, input, handleInputChange, handleSubmit: handleChatSubmit, isLoading } = useChat({
     api: '/api/deepseek/r1',
@@ -97,15 +136,24 @@ const CreateResume = () => {
 
   // 分析AI回复，更新当前步骤和简历数据
   const updateStepBasedOnResponse = (content: string) => {
-    // 根据AI回复的内容，判断当前完成的步骤
-    if (content.includes('教育背景') && currentStep === RESUME_STEPS.TARGET_JOB) {
+    // 根据AI回复的内容，判断当前步骤是否完成
+    if (content.includes('第1步') || content.includes('目标职位确认')) {
+      setCurrentStep(RESUME_STEPS.TARGET_JOB);
+    }
+    if (content.includes('第2步') || content.includes('教育背景')) {
       setCurrentStep(RESUME_STEPS.EDUCATION);
-    } else if (content.includes('工作经历') && currentStep === RESUME_STEPS.EDUCATION) {
+    }
+    if (content.includes('第3步') || content.includes('工作经历') || content.includes('实习经历')) {
       setCurrentStep(RESUME_STEPS.WORK_EXPERIENCE);
-    } else if (content.includes('项目经验') && currentStep === RESUME_STEPS.WORK_EXPERIENCE) {
+    }
+    if (content.includes('第4步') || content.includes('项目经验')) {
       setCurrentStep(RESUME_STEPS.PROJECTS);
-    } else if (content.includes('技能') && currentStep === RESUME_STEPS.PROJECTS) {
+    }
+    if (content.includes('第5步') || content.includes('技能证书')) {
       setCurrentStep(RESUME_STEPS.SKILLS);
+    }
+    if (content.includes('完成') && currentStep === RESUME_STEPS.SKILLS) {
+      setCurrentStep(RESUME_STEPS.CONFIRM);
     }
   };
 
@@ -150,6 +198,20 @@ const CreateResume = () => {
   const isCurrentStep = (step: ResumeStep) => {
     return step === currentStep;
   };
+
+  // 计算当前进度
+  const calculateProgress = () => {
+    const steps = Object.values(RESUME_STEPS);
+    const totalSteps = steps.length - 2; // 减去 INIT 和 CONFIRM
+    const currentIndex = steps.indexOf(currentStep);
+    const progressIndex = currentIndex > 0 ? currentIndex - 1 : 0; // 减去 INIT 的索引
+    return Math.round((progressIndex / totalSteps) * 100);
+  };
+
+  useEffect(() => {
+    // 监听步骤变化，更新进度
+    console.log('Current Step:', currentStep);
+  }, [currentStep]);
 
   // 处理文件上传
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,10 +356,9 @@ const CreateResume = () => {
         </div>
 
         {/* 聊天区域 */}
-        <div className="absolute inset-0 overflow-y-auto mt-20">
-          <div className="flex flex-col px-6">
-            <div className="h-4" />
-            <AnimatePresence initial={false}>
+        <div className="flex-1 overflow-y-auto pt-24 pb-32">
+          <div className="flex flex-col px-6 min-h-full">
+            <AnimatePresence initial={false} mode="wait">
               {messages.map((message) => (
                 message.role !== 'system' && (
                   <motion.div
@@ -334,20 +395,39 @@ const CreateResume = () => {
                   </motion.div>
                 )
               ))}
+
+              {/* AI思考中的加载状态 */}
+              {isLoading && !messages[messages.length - 1]?.content.includes('AI正在') && (
+                <motion.div
+                  key="loading"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="flex justify-start mb-6"
+                >
+                  <div className="flex items-start gap-3 max-w-[85%]">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-gradient-to-br from-gray-700 to-gray-800">
+                      <Bot className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 shadow-md border border-gray-200">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.3s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce"></div>
+                        </div>
+                        <span className="text-sm font-medium text-gray-600">AI正在深度分析您的简历需求...</span>
+                      </div>
+                      <span className="text-xs text-gray-500 px-1">
+                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </AnimatePresence>
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start mb-6"
-              >
-                <div className="flex items-center gap-3 text-gray-600 bg-white/90 backdrop-blur-md rounded-full px-5 py-2.5 shadow-md border border-gray-200">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-700" />
-                  <span className="text-sm font-medium text-gray-700">AI正在思考...</span>
-                </div>
-              </motion.div>
-            )}
-            <div ref={messagesEndRef} />
+            
+            <div ref={messagesEndRef} className="h-1" />
           </div>
         </div>
       </div>
