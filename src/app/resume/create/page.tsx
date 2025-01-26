@@ -377,7 +377,7 @@ const CreateResume = () => {
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
                   >
                     <div className={`flex items-start gap-3 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
                         message.role === 'user' 
                           ? 'bg-gradient-to-br from-blue-600 to-blue-700' 
                           : 'bg-gradient-to-br from-gray-700 to-gray-800'
@@ -387,7 +387,7 @@ const CreateResume = () => {
                           <Bot className="w-5 h-5 text-white" />
                         }
                       </div>
-                      <div className={`flex flex-col gap-2 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className={`flex flex-col gap-2 min-w-0 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <div className={`rounded-2xl px-6 py-4 max-w-full break-words shadow-md ${
                           message.role === 'user' 
                             ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white' 
