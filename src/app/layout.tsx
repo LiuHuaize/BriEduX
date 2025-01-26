@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { NavBarDemo } from '@/components/nav-bar-demo'
 import { BackgroundTiles } from '@/components/ui/background-tiles'
-import { UserMenu } from '@/components/ui/user-menu'
 import { AuthProvider } from "@/lib/contexts/AuthContext"
+import { NavigationProvider } from '@/components/providers/navigation-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,12 +26,9 @@ export default function RootLayout({
               <BackgroundTiles />
             </div>
             <div className="relative z-10">
-              <NavBarDemo />
-              <UserMenu />
+              <NavigationProvider />
               <main className="w-full">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-                  {children}
-                </div>
+                {children}
               </main>
             </div>
           </div>
