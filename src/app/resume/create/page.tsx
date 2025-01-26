@@ -139,6 +139,7 @@ const CreateResume = () => {
   const [resumeData, setResumeData] = useState<ResumeData>({});
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [showThinking, setShowThinking] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -155,6 +156,7 @@ const CreateResume = () => {
     onFinish: (message) => {
       // 分析AI回复，更新当前步骤
       updateStepBasedOnResponse(message.content);
+      setShowThinking(false);
     }
   });
 
@@ -186,6 +188,7 @@ const CreateResume = () => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
+    setShowThinking(true);
     // 更新简历数据
     const updatedResumeData = { ...resumeData };
     if (currentStep === RESUME_STEPS.TARGET_JOB && input.length > 0) {
@@ -380,9 +383,9 @@ const CreateResume = () => {
         </div>
 
         {/* 聊天区域 */}
-        <div className="flex-1 overflow-y-auto pt-24 pb-32">
+        <div className="flex-1 overflow-y-auto pt-24 pb-32 scroll-smooth">
           <div className="flex flex-col px-6 min-h-full">
-            <AnimatePresence initial={false} mode="wait">
+            <AnimatePresence mode="popLayout">
               {messages.map((message) => (
                 message.role !== 'system' && (
                   <motion.div
@@ -391,6 +394,11 @@ const CreateResume = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
+                    onAnimationComplete={() => {
+                      if (message.role === 'assistant') {
+                        setShowThinking(false);
+                      }
+                    }}
                   >
                     <div className={`flex items-start gap-3 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                       <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
@@ -420,30 +428,26 @@ const CreateResume = () => {
                 )
               ))}
 
-              {/* AI思考中的加载状态 */}
-              {isLoading && messages.length > 0 && (
-                messages[messages.length - 1]?.role === 'user' || 
-                !messages[messages.length - 1]?.content
-              ) && (
+              {/* AI 思考中的加载状态 */}
+              {showThinking && isLoading && (
                 <motion.div
-                  key="loading"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
+                  exit={{ opacity: 0, y: -20 }}
                   className="flex justify-start mb-6"
                 >
                   <div className="flex items-start gap-3 max-w-[85%]">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-gradient-to-br from-gray-700 to-gray-800">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-gradient-to-br from-gray-700 to-gray-800">
                       <Bot className="w-5 h-5 text-white" />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 shadow-md border border-gray-200">
-                        <div className="flex gap-1">
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.3s]"></div>
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce [animation-delay:-0.15s]"></div>
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-bounce"></div>
+                    <div className="flex flex-col gap-2 min-w-0">
+                      <div className="rounded-2xl px-6 py-4 bg-white border border-gray-200 shadow-md">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse delay-150" />
+                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse delay-300" />
+                          <span className="text-[15px] text-gray-500">AI 正在深度思考...</span>
                         </div>
-                        <span className="text-sm font-medium text-gray-600">AI正在深度分析您的简历需求...</span>
                       </div>
                       <span className="text-xs text-gray-500 px-1">
                         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
