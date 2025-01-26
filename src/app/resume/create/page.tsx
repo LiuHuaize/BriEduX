@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 // 定义简历信息收集的步骤
 const RESUME_STEPS = {
   INIT: 'init',
+  BASIC_INFO: 'basic_info',
   TARGET_JOB: 'target_job',
   EDUCATION: 'education',
   WORK_EXPERIENCE: 'work_experience',
@@ -33,6 +34,11 @@ const RESUME_STEPS = {
 type ResumeStep = typeof RESUME_STEPS[keyof typeof RESUME_STEPS];
 
 interface ResumeData {
+  basic_info?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
   target_job?: string;
   education?: string;
   work_experience?: string;
@@ -49,18 +55,29 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 - 你来负责将信息提取和格式化
 - 每次确认格式化的信息是否准确
 - 如果用户跳步，温询问他是否是因为缺少工作经历等，如果属实，允许跳步，并且标注这一步已完成
+- 不需要把之前步骤的信息全部重复一遍，最后汇总写最终简历的时候再写出来
 
 2. 信息收集步骤：
 
-第1步 - 目标职位：
+第1步 - 基础信息：
+- 询问用户的姓名、联系电话和邮箱
+- 引导用户按照顺序提供这些信息
+- 如果用户一次性提供多个信息，也要正确解析
+- 确保获取所有必要的基础信息后再进入下一步
+- 格式化输出：
+  姓名：xxx
+  电话：xxx
+  邮箱：xxx
+
+第2步 - 目标职位：
 - 用户可能直接说职位名称，如"AI产品经理"
-- 从用户回答中提取：职位名称、目标领域
+- 从用户回答中提取：职位名称
 - 总结并确认："我理解您期望申请的是XX领域的XX职位，对吗？"
 - 确认无误后，自然引导到下一步
 
-第2步 - 教育背景：
-- 询问所有的教育经历
-- 从用户回答中提取：学历、学校、专业、时间等信息
+第3步 - 教育背景：
+- 询问教育经历
+- 从用户回答中提取：学历、学校、专业、时间
 - 总结并确认
 - 如果用户提到多个学历，都记录下来
 - 确认无误后，继续下一步
@@ -68,7 +85,7 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
                      学校   年份
                      专业
 
-第3步 - 工作经历：
+第4步 - 工作经历：
 - 自然询问工作经历
 - 从回答中提取：公司、职位、年份、职责等
 - 格式化并确认当前工作经历
@@ -83,7 +100,7 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
       xxxx
 
 
-第4步 - 项目经验：
+第5步 - 项目经验：
 - 让用户自由分享项目经历
 - 提取关键信息：项目背景、角色、成果
 - 格式化并确认当前项目信息
@@ -97,7 +114,7 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
       xxxx
       xxxx
 
-第5步 - 技能证书：
+第6步 - 技能证书：
 - 让用户自由列举技能和证书
 - 整理成结构化信息
 - 确认并询问是否还有补充
@@ -130,7 +147,7 @@ const WELCOME_MESSAGE = {
   role: 'assistant',
   content: `您好！我是您的简历助手，让我们一步步完成您的专业简历。
 
-首先，请告诉我您期望申请的目标职位是什么？`
+首先，请告诉我您的姓名、联系电话和邮箱。`
 };
 
 const CreateResume = () => {
@@ -156,6 +173,9 @@ const CreateResume = () => {
     onFinish: (message) => {
       // 分析AI回复，更新当前步骤
       updateStepBasedOnResponse(message.content);
+    },
+    onResponse: () => {
+      // 在开始生成回复时立即隐藏loading
       setShowThinking(false);
     }
   });
@@ -163,19 +183,22 @@ const CreateResume = () => {
   // 分析AI回复，更新当前步骤和简历数据
   const updateStepBasedOnResponse = (content: string) => {
     // 根据AI回复的内容，判断当前步骤是否完成
-    if (content.includes('第1步') || content.includes('目标职位确认')) {
+    if (content.includes('第1步') || content.includes('基础信息')) {
+      setCurrentStep(RESUME_STEPS.BASIC_INFO);
+    }
+    if (content.includes('第2步') || content.includes('目标职位确认')) {
       setCurrentStep(RESUME_STEPS.TARGET_JOB);
     }
-    if (content.includes('第2步') || content.includes('教育背景')) {
+    if (content.includes('第3步') || content.includes('教育背景')) {
       setCurrentStep(RESUME_STEPS.EDUCATION);
     }
-    if (content.includes('第3步') || content.includes('工作经历') || content.includes('实习经历')) {
+    if (content.includes('第4步') || content.includes('工作经历') || content.includes('实习经历')) {
       setCurrentStep(RESUME_STEPS.WORK_EXPERIENCE);
     }
-    if (content.includes('第4步') || content.includes('项目经验')) {
+    if (content.includes('第5步') || content.includes('项目经验')) {
       setCurrentStep(RESUME_STEPS.PROJECTS);
     }
-    if (content.includes('第5步') || content.includes('技能证书')) {
+    if (content.includes('第6步') || content.includes('技能证书')) {
       setCurrentStep(RESUME_STEPS.SKILLS);
     }
     if (content.includes('完成') && currentStep === RESUME_STEPS.SKILLS) {
@@ -191,6 +214,13 @@ const CreateResume = () => {
     setShowThinking(true);
     // 更新简历数据
     const updatedResumeData = { ...resumeData };
+    if (currentStep === RESUME_STEPS.BASIC_INFO && input.length > 0) {
+      updatedResumeData.basic_info = {
+        name: input.split('\n')[0],
+        phone: input.split('\n')[1],
+        email: input.split('\n')[2]
+      };
+    }
     if (currentStep === RESUME_STEPS.TARGET_JOB && input.length > 0) {
       updatedResumeData.target_job = input;
     }
@@ -366,6 +396,7 @@ const CreateResume = () => {
               </div>
               <span className="font-medium text-gray-800">
                 {currentStep === RESUME_STEPS.INIT && '开始创建简历'}
+                {currentStep === RESUME_STEPS.BASIC_INFO && '基础信息'}
                 {currentStep === RESUME_STEPS.TARGET_JOB && '目标职位'}
                 {currentStep === RESUME_STEPS.EDUCATION && '教育背景'}
                 {currentStep === RESUME_STEPS.WORK_EXPERIENCE && '工作经历'}
@@ -394,11 +425,6 @@ const CreateResume = () => {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
-                    onAnimationComplete={() => {
-                      if (message.role === 'assistant') {
-                        setShowThinking(false);
-                      }
-                    }}
                   >
                     <div className={`flex items-start gap-3 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                       <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
@@ -497,6 +523,7 @@ const CreateResume = () => {
                     isStepCompleted(step) ? 'text-gray-800' : 
                     'text-gray-500'
                   }`}>
+                    {step === RESUME_STEPS.BASIC_INFO && '基础信息'}
                     {step === RESUME_STEPS.TARGET_JOB && '目标职位'}
                     {step === RESUME_STEPS.EDUCATION && '教育背景'}
                     {step === RESUME_STEPS.WORK_EXPERIENCE && '工作经历'}
