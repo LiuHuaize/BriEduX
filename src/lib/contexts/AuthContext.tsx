@@ -63,15 +63,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       setUser(result.user);
+      
       // 获取 ID token 并设置 cookie
       const idToken = await result.user.getIdToken();
-      await fetch('/api/auth/session', {
+      const response = await fetch('/api/auth/session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ idToken }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to set session');
+      }
+
+      // 如果有 from 参数，登录后重定向到该页面
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get('from') || '/';
+      router.push(from);
+      
     } catch (error: any) {
       console.error("登录失败:", error);
       throw new Error(getErrorMessage(error.code));
@@ -82,15 +93,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       setUser(result.user);
+      
       // 获取 ID token 并设置 cookie
       const idToken = await result.user.getIdToken();
-      await fetch('/api/auth/session', {
+      const response = await fetch('/api/auth/session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ idToken }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to set session');
+      }
+
+      router.push('/');
     } catch (error: any) {
       console.error("注册失败:", error);
       throw new Error(getErrorMessage(error.code));
@@ -101,10 +119,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await firebaseSignOut(auth);
       setUser(null);
+      
       // 清除 session cookie
-      await fetch('/api/auth/session', {
+      const response = await fetch('/api/auth/session', {
         method: 'DELETE',
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to clear session');
+      }
+
       router.push('/');
     } catch (error) {
       console.error("登出失败:", error);
