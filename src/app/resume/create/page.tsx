@@ -33,17 +33,44 @@ const RESUME_STEPS = {
 
 type ResumeStep = typeof RESUME_STEPS[keyof typeof RESUME_STEPS];
 
+interface Education {
+  school: string;
+  degree: string;
+  fieldOfStudy?: string;
+  startDate: string;
+  endDate: string;
+  achievements?: string[];
+}
+
+interface WorkExperience {
+  company: string;
+  position: string;
+  startDate: string;
+  endDate: string;
+  responsibilities: string[];
+}
+
+interface Project {
+  name: string;
+  role?: string;
+  startDate: string;
+  endDate: string;
+  description: string[];
+  technologies?: string[];
+}
+
 interface ResumeData {
-  basic_info?: {
-    name?: string;
-    phone?: string;
-    email?: string;
+  basic_info: {
+    name: string;
+    phone: string;
+    email: string;
   };
   target_job?: string;
-  education?: string;
-  work_experience?: string;
-  projects?: string;
-  skills?: string;
+  education: Education[];
+  work_experience: WorkExperience[];
+  projects: Project[];
+  skills?: string[];
+  certifications?: string[];
 }
 
 // 系统提示词，包含完整的对话策略
@@ -56,8 +83,8 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 - 每次确认格式化的信息是否准确
 - 如果用户跳步，温询问他是否是因为缺少工作经历等，如果属实，允许跳步，并且标注这一步已完成
 - 不需要把之前步骤的信息全部重复一遍，最后汇总写最终简历的时候再写出来
-- 在每一步（如工作经历、教育背景等）收集完数据后，加一句类似“请确认或补充更多细节”来鼓励用户进一步补充。如果用户描述较为简略，系统可以主动询问“您是否还有更多详细信息，例如团队规模、项目成果的具体数据等？”
-保持语气亲切自然，比如“您可以简单描述……”、“如果方便的话，请再补充……”，让用户感觉对话更像是交流而不是机械问答。
+- 在每一步（如工作经历、教育背景等）收集完数据后，加一句类似"请确认或补充更多细节"来鼓励用户进一步补充。如果用户描述较为简略，系统可以主动询问"您是否还有更多详细信息，例如团队规模、项目成果的具体数据等？"
+保持语气亲切自然，比如"您可以简单描述……"、"如果方便的话，请再补充……"，让用户感觉对话更像是交流而不是机械问答。
 
 
 2. 信息收集步骤：
@@ -80,9 +107,9 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 
 第3步 - 教育背景：
 - 询问教育经历 可以使用更详细的例子，引导用户提供完整的信息。提示词可以调整为：
-“请描述您的教育经历，例子：
-‘2015-2019，我在北京大学软件工程专业（本科）就读，gpa3.8，还曾获得国家奖学金与校内优秀学生称号。’
-这里请包含就读学校、专业、起止年份、以及您觉得值得标注的荣誉或奖项。”
+"请描述您的教育经历，例子：
+'2015-2019，我在北京大学软件工程专业（本科）就读，gpa3.8，还曾获得国家奖学金与校内优秀学生称号。'
+这里请包含就读学校、专业、起止年份、以及您觉得值得标注的荣誉或奖项。"
 这样不仅让例子更生动，也能帮助系统提取出起止时间、学校名称、专业详情及额外成就。
 
 - 从用户回答中提取：学历、学校、专业、时间
@@ -100,9 +127,9 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 - 主动询问："除了这份工作，您是否还有其他相关工作经历想要补充？"
 - 如果有，继续收集；如果没有，进入下一步
 - 注意：实习经历也可以在这里提到
-- “请描述您最近的工作经历，您可以这样说：
-‘2019-2021，我在字节跳动担任产品经理，主要负责AI产品规划和跨部门协调，带领团队从0到1成功交付多个核心项目，并在过程中提升了产品迭代效率。’
-这样便于我提取公司、职位、起止时间以及工作职责和成就哦！”
+- "请描述您最近的工作经历，您可以这样说：
+'2019-2021，我在字节跳动担任产品经理，主要负责AI产品规划和跨部门协调，带领团队从0到1成功交付多个核心项目，并在过程中提升了产品迭代效率。'
+这样便于我提取公司、职位、起止时间以及工作职责和成就哦！"
 通过这种方式，用户既能理解所需信息，又能自然而详细地描述自己的工作过程和成果。
 -  你的输出需要格式化一下，不需要要求用户输出格式，你来格式化，每个项目都需要单独的格式化 
       标题         持续时间
@@ -165,7 +192,16 @@ const WELCOME_MESSAGE = {
 const CreateResume = () => {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<ResumeStep>(RESUME_STEPS.INIT);
-  const [resumeData, setResumeData] = useState<ResumeData>({});
+  const [resumeData, setResumeData] = useState<ResumeData>({
+    basic_info: {
+      name: '',
+      phone: '',
+      email: ''
+    },
+    education: [],
+    work_experience: [],
+    projects: []
+  });
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showThinking, setShowThinking] = useState(false);
@@ -173,8 +209,82 @@ const CreateResume = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 解析AI助手的回复,更新简历数据
+  const parseAIResponse = async (content: string) => {
+    console.log('Parsing AI Response:', content);
+    
+    // 将最新的 assistant 回复也追加到消息数组中，确保传递完整的对话记录
+    const conversation = [...apiMessages, { role: 'assistant', content }];
+    console.log("Sending conversation to extraction API:", conversation);
+
+    try {
+      const response = await fetch('/api/deepseek/v3-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages: conversation }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to extract information');
+      }
+
+      const extractedData = await response.json();
+      console.log('Extracted Data:', extractedData);
+
+      // 更新简历数据
+      setResumeData(prevData => {
+        const updatedResumeData = { ...prevData };
+
+        // 更新基础信息
+        if (extractedData.basic_info) {
+          updatedResumeData.basic_info = {
+            ...updatedResumeData.basic_info,
+            ...extractedData.basic_info
+          };
+        }
+
+        // 更新目标职位
+        if (extractedData.target_job) {
+          updatedResumeData.target_job = extractedData.target_job;
+        }
+
+        // 更新教育经历
+        if (extractedData.education?.length > 0) {
+          updatedResumeData.education = extractedData.education;
+        }
+
+        // 更新工作经历
+        if (extractedData.work_experience?.length > 0) {
+          updatedResumeData.work_experience = extractedData.work_experience;
+        }
+
+        // 更新项目经验
+        if (extractedData.projects?.length > 0) {
+          updatedResumeData.projects = extractedData.projects;
+        }
+
+        // 更新技能和证书
+        if (extractedData.skills) {
+          updatedResumeData.skills = extractedData.skills;
+        }
+        if (extractedData.certifications) {
+          updatedResumeData.certifications = extractedData.certifications;
+        }
+
+        return updatedResumeData;
+      });
+
+      // 验证基础信息完整性后，再更新步骤
+      setTimeout(() => updateStepBasedOnResponse(), 0);
+    } catch (error) {
+      console.error('Error extracting information:', error);
+    }
+  };
+
   const { messages: apiMessages, input, handleInputChange, handleSubmit: handleChatSubmit, isLoading } = useChat({
-    api: '/api/deepseek/v3-single',
+    api: '/api/deepseek/r1-single',
     initialMessages: [
       {
         id: 'system',
@@ -183,8 +293,10 @@ const CreateResume = () => {
       }
     ],
     onFinish: (message) => {
-      // 分析AI回复，更新当前步骤
-      updateStepBasedOnResponse(message.content);
+      // 分析AI回复，更新当前步骤和简历数据
+      parseAIResponse(message.content);
+      // 延迟更新步骤，确保数据先被更新
+      setTimeout(() => updateStepBasedOnResponse(message.content), 0);
     },
     onResponse: () => {
       // 在开始生成回复时立即隐藏loading
@@ -192,55 +304,64 @@ const CreateResume = () => {
     }
   });
 
-  // 分析AI回复，更新当前步骤和简历数据
-  const updateStepBasedOnResponse = (content: string) => {
-    // 根据AI回复的内容，判断当前步骤是否完成
-    if (content.includes('第1步') || content.includes('基础信息')) {
+  // 分析AI回复，更新当前步骤
+  const updateStepBasedOnResponse = () => {
+    const basicValidation = validateBasicInfo();
+    if (!basicValidation.isComplete || Object.values(basicValidation.isValid).includes(false)) {
       setCurrentStep(RESUME_STEPS.BASIC_INFO);
-    }
-    if (content.includes('第2步') || content.includes('目标职位确认')) {
+    } else if (!resumeData.target_job) {
       setCurrentStep(RESUME_STEPS.TARGET_JOB);
-    }
-    if (content.includes('第3步') || content.includes('教育背景')) {
+    } else if (!resumeData.education || resumeData.education.length === 0) {
       setCurrentStep(RESUME_STEPS.EDUCATION);
-    }
-    if (content.includes('第4步') || content.includes('工作经历') || content.includes('实习经历')) {
+    } else if (!resumeData.work_experience || resumeData.work_experience.length === 0) {
       setCurrentStep(RESUME_STEPS.WORK_EXPERIENCE);
-    }
-    if (content.includes('第5步') || content.includes('项目经验')) {
+    } else if (!resumeData.projects || resumeData.projects.length === 0) {
       setCurrentStep(RESUME_STEPS.PROJECTS);
-    }
-    if (content.includes('第6步') || content.includes('技能证书')) {
+    } else if (!resumeData.skills || resumeData.skills.length === 0) {
       setCurrentStep(RESUME_STEPS.SKILLS);
-    }
-    if (content.includes('完成') && currentStep === RESUME_STEPS.SKILLS) {
+    } else {
       setCurrentStep(RESUME_STEPS.CONFIRM);
     }
   };
 
-  // 处理表单提交
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  // 验证基础信息是否完整
+  const validateBasicInfo = () => {
+    let { name, phone, email } = resumeData.basic_info;
 
-    setShowThinking(true);
-    // 更新简历数据
-    const updatedResumeData = { ...resumeData };
-    if (currentStep === RESUME_STEPS.BASIC_INFO && input.length > 0) {
-      updatedResumeData.basic_info = {
-        name: input.split('\n')[0],
-        phone: input.split('\n')[1],
-        email: input.split('\n')[2]
-      };
-    }
-    if (currentStep === RESUME_STEPS.TARGET_JOB && input.length > 0) {
-      updatedResumeData.target_job = input;
-    }
-    setResumeData(updatedResumeData);
+    // 手机号码允许包含横线、空格等格式，只要不为空即可
+    const isValid = {
+      name: name.length >= 2,
+      phone: phone.trim() !== '',
+      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    };
 
-    // 调用聊天提交
-    handleChatSubmit(e);
+    const isComplete = isValid.name && isValid.phone && isValid.email;
+
+    return {
+      isComplete,
+      isValid,
+      message: !isComplete ? '请填写完整的基础信息' :
+               !isValid.name ? '姓名长度不足' :
+               !isValid.phone ? '请输入手机号码' :
+               !isValid.email ? '请输入有效的邮箱地址' : ''
+    };
   };
+
+  useEffect(() => {
+    // 监听 resumeData 变化,在控制台输出调试信息
+    console.log('Resume Data Updated:', resumeData);
+    
+    // 如果当前是基础信息步骤,验证信息完整性
+    if (currentStep === RESUME_STEPS.BASIC_INFO) {
+      const validation = validateBasicInfo();
+      console.log('Basic Info Validation:', validation);
+      
+      // 如果信息完整且有效,可以考虑自动进入下一步
+      if (validation.isComplete && !Object.values(validation.isValid).includes(false)) {
+        console.log('Basic info is complete and valid, ready for next step');
+      }
+    }
+  }, [resumeData, currentStep]);
 
   // 合并欢迎消息和API消息
   const messages = [WELCOME_MESSAGE, ...apiMessages.filter(msg => msg.role !== 'system')];
@@ -367,6 +488,22 @@ const CreateResume = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // 处理表单提交
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    setShowThinking(true);
+    
+    // 添加调试信息
+    console.log('Current Step:', currentStep);
+    console.log('User Input:', input);
+    console.log('Current Resume Data:', resumeData);
+    
+    // 调用聊天提交
+    await handleChatSubmit(e);
+  };
+
   return (
     <div className="fixed inset-0 flex bg-gradient-to-br from-gray-100 via-white to-gray-100">
       {/* 返回按钮 */}
@@ -378,6 +515,27 @@ const CreateResume = () => {
         <ArrowLeft className="w-5 h-5" />
         <span>返回列表</span>
       </Button>
+
+      {/* 验证提示 */}
+      {currentStep === RESUME_STEPS.BASIC_INFO && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50">
+          <AnimatePresence mode="wait">
+            {validateBasicInfo().message && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-white/90 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border border-gray-200"
+              >
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                  <span className="text-gray-700">{validateBasicInfo().message}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* 左侧历史记录列表 */}
       <div className="w-[280px] border-r border-gray-200 bg-white/90 backdrop-blur-md">

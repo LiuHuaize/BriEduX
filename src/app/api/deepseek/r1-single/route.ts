@@ -12,7 +12,7 @@ export const runtime = 'edge';
 export async function POST(req: Request) {
   const { messages, temperature = 0.7, max_tokens = 2000 } = await req.json();
 
-  // 调用 DeepSeek-V3
+  // 调用 DeepSeek-r1
   const response = await client.chat.completions.create({
     model: 'deepseek-r1',
     messages,
