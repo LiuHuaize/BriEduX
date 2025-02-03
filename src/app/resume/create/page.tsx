@@ -18,6 +18,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useChat } from 'ai/react';
 import { useRouter } from 'next/navigation';
+import { useResume } from "@/app/resume/context/ResumeContext";
+import { ResumeData } from "@/app/resume/context/ResumeContext";
 
 // 定义简历信息收集的步骤
 const RESUME_STEPS = {
@@ -191,8 +193,9 @@ const WELCOME_MESSAGE = {
 
 const CreateResume = () => {
   const router = useRouter();
+  const { setResumeData } = useResume();
   const [currentStep, setCurrentStep] = useState<ResumeStep>(RESUME_STEPS.INIT);
-  const [resumeData, setResumeData] = useState<ResumeData>({
+  const [resumeData, setResumeDataState] = useState<ResumeData>({
     basic_info: {
       name: '',
       phone: '',
@@ -234,7 +237,7 @@ const CreateResume = () => {
       console.log('Extracted Data:', extractedData);
 
       // 更新简历数据
-      setResumeData(prevData => {
+      setResumeDataState(prevData => {
         const updatedResumeData = { ...prevData };
 
         // 更新基础信息
@@ -520,6 +523,37 @@ const CreateResume = () => {
     await handleChatSubmit(e);
   };
 
+  const handleExampleSubmit = () => {
+    const sampleData: ResumeData = {
+      basic_info: {
+        name: "张三",
+        phone: "13800138000",
+        email: "zhangsan@example.com"
+      },
+      target_job: "前端开发工程师",
+      education: [
+        {
+          school: "示例大学",
+          major: "计算机科学",
+          degree: "本科",
+          start_year: "2019",
+          end_year: "2023",
+          extra: "优秀毕业生"
+        }
+      ],
+      work_experience: [],
+      projects: [],
+      skills: ["JavaScript", "React", "TypeScript"],
+      certifications: [],
+      meta: {
+        template: "default"
+      }
+    };
+
+    setResumeData(sampleData);
+    router.push("/resume/choose-template");
+  };
+
   return (
     <div className="fixed inset-0 flex bg-gradient-to-br from-gray-100 via-white to-gray-100">
       {/* 返回按钮 */}
@@ -704,9 +738,9 @@ const CreateResume = () => {
             <div className="pt-4 border-t border-gray-200">
               <Button 
                 className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
-                onClick={() => {/* 处理生成简历逻辑 */}}
+                onClick={handleExampleSubmit}
               >
-                生成简历
+                使用示例数据继续
               </Button>
             </div>
           )}
