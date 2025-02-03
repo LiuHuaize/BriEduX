@@ -21,8 +21,17 @@ export async function POST(req: Request) {
     stream: true,
   });
 
-  // 转换为流式响应
-  const stream = OpenAIStream(response);
+  // 转换为流式响应，并添加控制台输出
+  const stream = OpenAIStream(response, {
+    onToken: (token) => {
+      // 在服务器端输出每个 token
+      console.log(token);
+    },
+    onCompletion: (completion) => {
+      // 在服务器端输出完整的响应
+      console.log('Complete response:', completion);
+    },
+  });
 
   // 返回流式响应
   return new StreamingTextResponse(stream);

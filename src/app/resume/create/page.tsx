@@ -162,7 +162,7 @@ const CreateResume = () => {
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { messages: apiMessages, input, handleInputChange, handleSubmit: handleChatSubmit, isLoading } = useChat({
-    api: '/api/deepseek/r1',
+    api: '/api/deepseek/v3',
     initialMessages: [
       {
         id: 'system',
