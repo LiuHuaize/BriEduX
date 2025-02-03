@@ -328,7 +328,6 @@ const CreateResume = () => {
   const validateBasicInfo = () => {
     let { name, phone, email } = resumeData.basic_info;
 
-    // 手机号码允许包含横线、空格等格式，只要不为空即可
     const isValid = {
       name: name.length >= 2,
       phone: phone.trim() !== '',
@@ -340,28 +339,45 @@ const CreateResume = () => {
     return {
       isComplete,
       isValid,
-      message: !isComplete ? '请填写完整的基础信息' :
-               !isValid.name ? '姓名长度不足' :
-               !isValid.phone ? '请输入手机号码' :
-               !isValid.email ? '请输入有效的邮箱地址' : ''
+      message: '' // 不再显示提示信息
     };
   };
 
   useEffect(() => {
-    // 监听 resumeData 变化,在控制台输出调试信息
+    // 监听 resumeData 变化
     console.log('Resume Data Updated:', resumeData);
     
-    // 如果当前是基础信息步骤,验证信息完整性
     if (currentStep === RESUME_STEPS.BASIC_INFO) {
       const validation = validateBasicInfo();
-      console.log('Basic Info Validation:', validation);
       
-      // 如果信息完整且有效,可以考虑自动进入下一步
       if (validation.isComplete && !Object.values(validation.isValid).includes(false)) {
-        console.log('Basic info is complete and valid, ready for next step');
       }
     }
   }, [resumeData, currentStep]);
+
+  // 新增 useEffect，当 resumeData 更新后，根据最新值更新步骤
+  useEffect(() => {
+    const basicValidation = validateBasicInfo();
+    if (basicValidation.isComplete) {
+      // 当前基础信息验证通过后，若目标职位为空，则移动到目标职位步骤
+      if (!resumeData.target_job) {
+        setCurrentStep(RESUME_STEPS.TARGET_JOB);
+      } else if (!resumeData.education || resumeData.education.length === 0) {
+        setCurrentStep(RESUME_STEPS.EDUCATION);
+      } else if (!resumeData.work_experience || resumeData.work_experience.length === 0) {
+        setCurrentStep(RESUME_STEPS.WORK_EXPERIENCE);
+      } else if (!resumeData.projects || resumeData.projects.length === 0) {
+        setCurrentStep(RESUME_STEPS.PROJECTS);
+      } else if (!resumeData.skills || resumeData.skills.length === 0) {
+        setCurrentStep(RESUME_STEPS.SKILLS);
+      } else {
+        setCurrentStep(RESUME_STEPS.CONFIRM);
+      }
+    } else {
+      // 若基本信息不完整，则始终保持在基础信息步骤
+      setCurrentStep(RESUME_STEPS.BASIC_INFO);
+    }
+  }, [resumeData]);
 
   // 合并欢迎消息和API消息
   const messages = [WELCOME_MESSAGE, ...apiMessages.filter(msg => msg.role !== 'system')];
@@ -515,27 +531,6 @@ const CreateResume = () => {
         <ArrowLeft className="w-5 h-5" />
         <span>返回列表</span>
       </Button>
-
-      {/* 验证提示 */}
-      {currentStep === RESUME_STEPS.BASIC_INFO && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50">
-          <AnimatePresence mode="wait">
-            {validateBasicInfo().message && (
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white/90 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border border-gray-200"
-              >
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <span className="text-gray-700">{validateBasicInfo().message}</span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
 
       {/* 左侧历史记录列表 */}
       <div className="w-[280px] border-r border-gray-200 bg-white/90 backdrop-blur-md">
