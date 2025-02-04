@@ -1,33 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, ArrowRight, UserPlus } from "lucide-react";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(0);
   const router = useRouter();
   const { signUp } = useAuth();
 
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      setError("两次输入的密码不一致");
+    if (countdown > 0) {
+      setError(`请等待 ${countdown} 秒后重试`);
       return;
     }
+    
     setLoading(true);
     setError("");
+    
     try {
       await signUp(email, password);
-      router.push("/");
     } catch (error: any) {
       setError(error.message);
+      // 如果是超时错误，设置倒计时
+      if (error.message.includes('请等待')) {
+        const seconds = error.message.match(/\d+/)?.[0];
+        if (seconds) {
+          setCountdown(parseInt(seconds));
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -39,10 +56,10 @@ export default function RegisterPage() {
         <div className="w-full max-w-[400px] space-y-8 bg-white shadow-xl rounded-2xl p-8 relative">
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight">
-              创建新账户
+              创建账户
             </h2>
             <p className="text-sm text-gray-500">
-              加入我们开启您的求职之旅
+              注册一个新账户开始使用
             </p>
           </div>
 
@@ -98,32 +115,12 @@ export default function RegisterPage() {
                   />
                 </div>
               </div>
-
-              <div className="relative">
-                <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
-                  确认密码
-                </label>
-                <div className="relative rounded-lg">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    id="confirm-password"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="请再次输入密码"
-                    className="block w-full pl-10 pr-3 py-2.5 text-gray-900 placeholder-gray-400 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white sm:text-sm transition-colors duration-200"
-                  />
-                </div>
-              </div>
             </div>
 
             <div>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || countdown > 0}
                 className="group relative w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
@@ -133,6 +130,10 @@ export default function RegisterPage() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     注册中...
+                  </div>
+                ) : countdown > 0 ? (
+                  <div className="flex items-center justify-center">
+                    {countdown} 秒后可重试
                   </div>
                 ) : (
                   <div className="flex items-center justify-center">
