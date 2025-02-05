@@ -4,202 +4,341 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Search, 
-  Briefcase, 
-  Target, 
-  Star,
-  Building2,
-  MapPin,
-  Users,
+  Upload,
+  FileText,
+  Filter,
   ArrowRight,
-  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
-const jobTypes = [
-  { id: "all", label: "全职", count: 2345 },
-  { id: "intern", label: "实习", count: 1234 },
-  { id: "parttime", label: "兼职", count: 890 },
-  { id: "campus", label: "校招", count: 678 },
-  { id: "social", label: "社招", count: 456 },
-  { id: "remote", label: "远程", count: 234 },
-];
-
-const jobCategories = [
-  {
-    title: "技术研发",
-    count: 2345,
-    icon: Search,
-    color: "blue",
-    trending: true,
-    description: "软件开发、算法、人工智能等技术岗位"
-  },
-  {
-    title: "产品设计",
-    count: 1234,
-    icon: Target,
-    color: "indigo",
-    trending: true,
-    description: "产品经理、UI/UX 设计师等创意岗位"
-  },
-  {
-    title: "运营市场",
-    count: 890,
-    icon: Users,
-    color: "purple",
-    trending: false,
-    description: "市场营销、内容运营、用户增长等岗位"
-  },
-  {
-    title: "职能支持",
-    count: 567,
-    icon: Building2,
-    color: "green",
-    trending: false,
-    description: "人力资源、财务、行政等支持岗位"
-  },
-];
+// 类型定义
+type JobFilter = {
+  location?: string;
+  position?: string;
+  minSalary?: number;
+  education?: string;
+  companyType?: string;
+  experience?: string;
+  keywords?: string[];
+};
 
 export default function JobsPage() {
-  const [selectedType, setSelectedType] = useState("all");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<JobFilter>({});
+  const [activeMethod, setActiveMethod] = useState<'resume' | 'search'>('resume');
+
+  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validTypes.includes(file.type)) {
+      alert('请上传 PDF 或 Word 文档');
+      return;
+    }
+
+    setResumeFile(file);
+    setIsUploading(true);
+    // TODO: 实现文件上传和简历分析逻辑
+    setIsUploading(false);
+  };
+
+  const handleSearch = async () => {
+    // TODO: 实现搜索逻辑
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-20">
-      {/* Header Section */}
-      <div className="relative overflow-hidden pt-16 pb-32">
-        <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] bg-top" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <motion.h1 
-              className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* 顶部背景装饰 */}
+      <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-blue-50 to-transparent -z-10" />
+      
+      {/* 主要内容区域 */}
+      <div className="relative max-w-6xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+        {/* 标题区域 */}
+        <div className="text-center mb-16">
+          <motion.h1 
+            className="text-5xl sm:text-6xl font-bold text-gray-900 tracking-tight mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            匹配理想岗位
+          </motion.h1>
+          <motion.p 
+            className="text-xl text-gray-600 max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            上传简历或直接搜索，找到最适合你的工作机会
+          </motion.p>
+        </div>
+
+        {/* 选择方式切换 */}
+        <div className="flex justify-center mb-12">
+          <div className="inline-flex p-1 bg-gray-100 rounded-xl">
+            <button
+              onClick={() => setActiveMethod('resume')}
+              className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-all ${
+                activeMethod === 'resume'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
-              匹配理想岗位
-            </motion.h1>
-            <motion.p 
-              className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              <FileText className="w-5 h-5" />
+              <span>简历匹配</span>
+            </button>
+            <button
+              onClick={() => setActiveMethod('search')}
+              className={`px-6 py-3 rounded-lg flex items-center space-x-2 transition-all ${
+                activeMethod === 'search'
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
-              基于你的简历，智能匹配最适合的工作机会
-            </motion.p>
+              <Search className="w-5 h-5" />
+              <span>自定义搜索</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Job Types Filter */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-16">
+        {/* 内容区域 */}
         <motion.div 
-          className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
+          className="max-w-3xl mx-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Filter className="w-5 h-5 text-blue-600" />
-              筛选条件
-            </h2>
-            <Button 
-              variant="outline"
-              size="sm"
-              className="text-gray-500 hover:text-gray-700"
-            >
-              重置筛选
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {jobTypes.map((type) => (
-              <Button
-                key={type.id}
-                variant={selectedType === type.id ? "default" : "outline"}
-                onClick={() => setSelectedType(type.id)}
-                className={`
-                  group relative 
-                  ${selectedType === type.id 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                    : 'hover:bg-blue-50'
-                  }
-                `}
-              >
-                <span>{type.label}</span>
-                <span className="ml-2 text-xs opacity-60">({type.count})</span>
-                {selectedType === type.id && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-white"
-                  />
-                )}
-              </Button>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Job Categories */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {jobCategories.map((category, index) => (
-            <motion.div
-              key={category.title}
-              className={`
-                group relative bg-white rounded-2xl shadow-lg hover:shadow-xl 
-                transition-all duration-300 cursor-pointer border border-gray-100
-                ${selectedCategory === category.title ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-              `}
-              onClick={() => setSelectedCategory(category.title)}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 + 0.3 }}
-              whileHover={{ y: -5 }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 bg-${category.color}-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                    <category.icon className={`w-6 h-6 text-${category.color}-600`} />
+          {activeMethod === 'resume' ? (
+            // 简历上传区域
+            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+              <div className="relative group cursor-pointer">
+                <input
+                  type="file"
+                  id="resume-upload"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleResumeUpload}
+                />
+                <Label
+                  htmlFor="resume-upload"
+                  className="block"
+                >
+                  <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-gray-200 rounded-xl group-hover:border-blue-400 transition-colors duration-200">
+                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors duration-200">
+                      <Upload className="w-10 h-10 text-blue-600" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      {resumeFile ? resumeFile.name : "点击上传简历"}
+                    </h3>
+                    <p className="text-gray-500">支持 PDF、Word 格式</p>
+                    {isUploading && (
+                      <div className="mt-4 text-blue-600 flex items-center">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2" />
+                        正在分析简历...
+                      </div>
+                    )}
                   </div>
-                  {category.trending && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      热门
-                    </span>
-                  )}
+                </Label>
+              </div>
+            </div>
+          ) : (
+            // 自定义搜索区域
+            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
+              <div className="space-y-6">
+                <div className="relative">
+                  <textarea
+                    placeholder="例如：我想要在重庆找一份律师的工作，我是本科然后想要一份6000以上的工作"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-32 px-4 py-3 text-base resize-none rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                  />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {category.title}
-                </h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  {category.description}
-                </p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">
-                    {category.count} 个职位
-                  </span>
-                  <ArrowRight className="w-5 h-5 text-gray-400 opacity-0 group-hover:opacity-100 transform translate-x-0 group-hover:translate-x-2 transition-all" />
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" className="text-gray-600 hover:text-gray-900">
+                        <Filter className="w-4 h-4 mr-2" />
+                        高级筛选
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[500px] sm:w-[540px] bg-white/80 backdrop-blur-xl">
+                      <SheetHeader className="px-1 border-b pb-6">
+                        <SheetTitle className="text-2xl font-semibold text-gray-800">高级筛选</SheetTitle>
+                        <SheetDescription className="text-base text-gray-500">
+                          设置详细的工作筛选条件，帮助你更精准地找到心仪的工作
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="mt-8 space-y-8 px-1">
+                        {/* 工作基本信息 */}
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-400 mb-4">基本信息</h3>
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">工作地点</Label>
+                              <Input
+                                placeholder="例如：重庆"
+                                value={filters.location}
+                                onChange={(e) => setFilters({...filters, location: e.target.value})}
+                                className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">职位名称</Label>
+                              <Input
+                                placeholder="例如：律师"
+                                value={filters.position}
+                                onChange={(e) => setFilters({...filters, position: e.target.value})}
+                                className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 薪资和学历要求 */}
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-400 mb-4">薪资与要求</h3>
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">最低薪资</Label>
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  placeholder="例如：6"
+                                  value={filters.minSalary}
+                                  onChange={(e) => setFilters({...filters, minSalary: Number(e.target.value)})}
+                                  className="h-11 pr-16 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                                />
+                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400 border-l border-gray-200">
+                                  K/月
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">学历</Label>
+                              <Select
+                                value={filters.education}
+                                onValueChange={(value) => setFilters({...filters, education: value})}
+                              >
+                                <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectValue placeholder="选择学历要求" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white/80 backdrop-blur-xl max-h-[300px]">
+                                  <SelectItem value="1">1. 不限</SelectItem>
+                                  <SelectItem value="2">2. 初中及以下</SelectItem>
+                                  <SelectItem value="3">3. 中技</SelectItem>
+                                  <SelectItem value="4">4. 高中</SelectItem>
+                                  <SelectItem value="5">5. 中专/中技</SelectItem>
+                                  <SelectItem value="6">6. 大专</SelectItem>
+                                  <SelectItem value="7">7. 本科</SelectItem>
+                                  <SelectItem value="8">8. 硕士</SelectItem>
+                                  <SelectItem value="9">9. MBA/EMBA</SelectItem>
+                                  <SelectItem value="10">10. EMBA</SelectItem>
+                                  <SelectItem value="11">11. 博士</SelectItem>
+                                  <SelectItem value="12">12. 其他</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 公司和经验要求 */}
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-400 mb-4">公司与经验</h3>
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">公司类型</Label>
+                              <Select
+                                value={filters.companyType}
+                                onValueChange={(value) => setFilters({...filters, companyType: value})}
+                              >
+                                <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectValue placeholder="选择公司类型" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white/80 backdrop-blur-xl max-h-[300px]">
+                                  <SelectItem value="1">1. 国企</SelectItem>
+                                  <SelectItem value="2">2. 外商独资</SelectItem>
+                                  <SelectItem value="3">3. 代表处</SelectItem>
+                                  <SelectItem value="4">4. 合资</SelectItem>
+                                  <SelectItem value="5">5. 民营</SelectItem>
+                                  <SelectItem value="6">6. 国家机关</SelectItem>
+                                  <SelectItem value="7">7. 其他</SelectItem>
+                                  <SelectItem value="8">8. 股份制企业</SelectItem>
+                                  <SelectItem value="9">9. 上市公司</SelectItem>
+                                  <SelectItem value="10">10. 事业单位</SelectItem>
+                                  <SelectItem value="11">11. 银行</SelectItem>
+                                  <SelectItem value="12">12. 医院</SelectItem>
+                                  <SelectItem value="13">13. 学校/下级学院</SelectItem>
+                                  <SelectItem value="14">14. 律师事务所</SelectItem>
+                                  <SelectItem value="15">15. 社会团体</SelectItem>
+                                  <SelectItem value="16">16. 港澳台公司</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">工作经验</Label>
+                              <Select
+                                value={filters.experience}
+                                onValueChange={(value) => setFilters({...filters, experience: value})}
+                              >
+                                <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectValue placeholder="选择工作经验" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-white/80 backdrop-blur-xl">
+                                  <SelectItem value="fresh">应届生</SelectItem>
+                                  <SelectItem value="1-3">1-3年</SelectItem>
+                                  <SelectItem value="3-5">3-5年</SelectItem>
+                                  <SelectItem value="5-10">5-10年</SelectItem>
+                                  <SelectItem value="10+">10年以上</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-6 border-t">
+                          <Button 
+                            onClick={() => setFilters({})} 
+                            variant="outline" 
+                            className="w-full h-11 border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors"
+                          >
+                            重置筛选条件
+                          </Button>
+                        </div>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                  <Button 
+                    onClick={handleSearch}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8"
+                  >
+                    搜索
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
                 </div>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+          )}
+        </motion.div>
       </div>
-
-      {/* Action Button */}
-      <motion.div 
-        className="fixed bottom-8 right-8"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Button
-          size="lg"
-          className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full px-8 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300"
-        >
-          <Target className="w-5 h-5 mr-2" />
-          开始匹配
-        </Button>
-      </motion.div>
     </div>
   );
 } 
