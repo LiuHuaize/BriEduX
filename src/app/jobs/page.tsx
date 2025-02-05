@@ -64,11 +64,64 @@ export default function JobsPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState<JobFilter>({});
+  const [filters, setFilters] = useState<JobFilter>({
+    location: "",
+    position: "",
+    minSalary: undefined,
+    education: undefined,
+    companyType: undefined,
+    experience: undefined,
+    keywords: [],
+  });
   const [activeMethod, setActiveMethod] = useState<'resume' | 'search'>('resume');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<JobInfo[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  // 构建搜索查询
+  const buildSearchQuery = () => {
+    let query = searchQuery;
+
+    // 如果有筛选条件，将其添加到查询中
+    if (filters.location) {
+      query += ` 工作地点在${filters.location}`;
+    }
+    if (filters.position) {
+      query += ` 职位是${filters.position}`;
+    }
+    if (filters.minSalary) {
+      query += ` 薪资${filters.minSalary}k以上`;
+    }
+    if (filters.education) {
+      const educationMap: { [key: string]: string } = {
+        "1": "学历不限",
+        "2": "初中及以下",
+        "3": "中技",
+        "4": "高中",
+        "5": "中专/中技",
+        "6": "大专",
+        "7": "本科",
+        "8": "硕士",
+        "9": "MBA/EMBA",
+        "10": "EMBA",
+        "11": "博士",
+        "12": "其他"
+      };
+      query += ` 学历要求${educationMap[filters.education]}`;
+    }
+    if (filters.experience) {
+      const experienceMap: { [key: string]: string } = {
+        "fresh": "应届生",
+        "1-3": "1-3年经验",
+        "3-5": "3-5年经验",
+        "5-10": "5-10年经验",
+        "10+": "10年以上经验"
+      };
+      query += ` 工作经验${experienceMap[filters.experience]}`;
+    }
+
+    return query.trim();
+  };
 
   const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -87,8 +140,10 @@ export default function JobsPage() {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setSearchError('请输入搜索内容');
+    const finalQuery = buildSearchQuery();
+    
+    if (!finalQuery) {
+      setSearchError('请输入搜索内容或设置筛选条件');
       return;
     }
 
@@ -102,7 +157,7 @@ export default function JobsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: searchQuery }),
+        body: JSON.stringify({ query: finalQuery }),
       });
 
       const data = await response.json();
@@ -121,6 +176,19 @@ export default function JobsPage() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  // 重置筛选条件
+  const handleResetFilters = () => {
+    setFilters({
+      location: "",
+      position: "",
+      minSalary: undefined,
+      education: undefined,
+      companyType: undefined,
+      experience: undefined,
+      keywords: [],
+    });
   };
 
   return (
@@ -254,7 +322,7 @@ export default function JobsPage() {
                                 <Label className="text-sm font-medium text-gray-700">工作地点</Label>
                                 <Input
                                   placeholder="例如：重庆"
-                                  value={filters.location}
+                                  value={filters.location || ""}
                                   onChange={(e) => setFilters({...filters, location: e.target.value})}
                                   className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
                                 />
@@ -263,7 +331,7 @@ export default function JobsPage() {
                                 <Label className="text-sm font-medium text-gray-700">职位名称</Label>
                                 <Input
                                   placeholder="例如：律师"
-                                  value={filters.position}
+                                  value={filters.position || ""}
                                   onChange={(e) => setFilters({...filters, position: e.target.value})}
                                   className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
                                 />
@@ -281,8 +349,8 @@ export default function JobsPage() {
                                   <Input
                                     type="number"
                                     placeholder="例如：6"
-                                    value={filters.minSalary}
-                                    onChange={(e) => setFilters({...filters, minSalary: Number(e.target.value)})}
+                                    value={filters.minSalary || ""}
+                                    onChange={(e) => setFilters({...filters, minSalary: e.target.value ? Number(e.target.value) : undefined})}
                                     className="h-11 pr-16 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
                                   />
                                   <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400 border-l border-gray-200">
@@ -293,8 +361,8 @@ export default function JobsPage() {
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">学历</Label>
                                 <Select
-                                  value={filters.education}
-                                  onValueChange={(value) => setFilters({...filters, education: value})}
+                                  value={filters.education || ""}
+                                  onValueChange={(value) => setFilters({...filters, education: value || undefined})}
                                 >
                                   <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
                                     <SelectValue placeholder="选择学历要求" />
@@ -325,8 +393,8 @@ export default function JobsPage() {
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">公司类型</Label>
                                 <Select
-                                  value={filters.companyType}
-                                  onValueChange={(value) => setFilters({...filters, companyType: value})}
+                                  value={filters.companyType || ""}
+                                  onValueChange={(value) => setFilters({...filters, companyType: value || undefined})}
                                 >
                                   <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
                                     <SelectValue placeholder="选择公司类型" />
@@ -354,8 +422,8 @@ export default function JobsPage() {
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">工作经验</Label>
                                 <Select
-                                  value={filters.experience}
-                                  onValueChange={(value) => setFilters({...filters, experience: value})}
+                                  value={filters.experience || ""}
+                                  onValueChange={(value) => setFilters({...filters, experience: value || undefined})}
                                 >
                                   <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
                                     <SelectValue placeholder="选择工作经验" />
@@ -374,7 +442,7 @@ export default function JobsPage() {
 
                           <div className="pt-6 border-t">
                             <Button 
-                              onClick={() => setFilters({})} 
+                              onClick={handleResetFilters} 
                               variant="outline" 
                               className="w-full h-11 border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors"
                             >
@@ -455,6 +523,28 @@ export default function JobsPage() {
                       </Card>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* 在搜索框下方添加当前筛选条件提示 */}
+              {Object.values(filters).some(value => value !== undefined && value !== "" && value !== null) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {filters.location && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
+                      地点: {filters.location}
+                    </div>
+                  )}
+                  {filters.position && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
+                      职位: {filters.position}
+                    </div>
+                  )}
+                  {filters.minSalary && (
+                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
+                      最低薪资: {filters.minSalary}k
+                    </div>
+                  )}
+                  {/* ... 其他筛选条件标签 ... */}
                 </div>
               )}
             </div>
