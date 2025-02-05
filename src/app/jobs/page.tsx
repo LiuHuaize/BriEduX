@@ -301,39 +301,48 @@ export default function JobsPage() {
                   <div className="flex items-center justify-between">
                     <Sheet>
                       <SheetTrigger asChild>
-                        <Button variant="outline" className="text-gray-600 hover:text-gray-900">
-                          <Filter className="w-4 h-4 mr-2" />
+                        <Button 
+                          variant="outline" 
+                          className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-300 shadow-sm"
+                        >
+                          <Filter className="w-4 h-4 mr-2 text-gray-500" />
                           高级筛选
                         </Button>
                       </SheetTrigger>
-                      <SheetContent side="right" className="w-[500px] sm:w-[540px] bg-white/80 backdrop-blur-xl">
-                        <SheetHeader className="px-1 border-b pb-6">
+                      <SheetContent 
+                        side="right" 
+                        className="w-[500px] sm:w-[540px] bg-white border-l border-gray-100 shadow-2xl"
+                      >
+                        <SheetHeader className="px-1 border-b border-gray-100 pb-6">
                           <SheetTitle className="text-2xl font-semibold text-gray-800">高级筛选</SheetTitle>
                           <SheetDescription className="text-base text-gray-500">
                             设置详细的工作筛选条件，帮助你更精准地找到心仪的工作
                           </SheetDescription>
                         </SheetHeader>
-                        <div className="mt-8 space-y-8 px-1">
+                        <div className="mt-8 space-y-10 px-1">
                           {/* 工作基本信息 */}
                           <div>
-                            <h3 className="text-sm font-medium text-gray-400 mb-4">基本信息</h3>
+                            <h3 className="text-sm font-medium text-gray-400 mb-6 flex items-center">
+                              <span className="w-1 h-4 bg-blue-500 rounded-full mr-2"></span>
+                              基本信息
+                            </h3>
                             <div className="grid grid-cols-2 gap-6">
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">工作地点</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">工作地点</Label>
                                 <Input
                                   placeholder="例如：重庆"
                                   value={filters.location || ""}
                                   onChange={(e) => setFilters({...filters, location: e.target.value})}
-                                  className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                                  className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                                 />
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">职位名称</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">职位名称</Label>
                                 <Input
                                   placeholder="例如：律师"
                                   value={filters.position || ""}
                                   onChange={(e) => setFilters({...filters, position: e.target.value})}
-                                  className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                                  className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                                 />
                               </div>
                             </div>
@@ -341,45 +350,48 @@ export default function JobsPage() {
 
                           {/* 薪资和学历要求 */}
                           <div>
-                            <h3 className="text-sm font-medium text-gray-400 mb-4">薪资与要求</h3>
+                            <h3 className="text-sm font-medium text-gray-400 mb-6 flex items-center">
+                              <span className="w-1 h-4 bg-green-500 rounded-full mr-2"></span>
+                              薪资与要求
+                            </h3>
                             <div className="grid grid-cols-2 gap-6">
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">最低薪资</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">最低薪资</Label>
                                 <div className="relative">
                                   <Input
                                     type="number"
                                     placeholder="例如：6"
                                     value={filters.minSalary || ""}
                                     onChange={(e) => setFilters({...filters, minSalary: e.target.value ? Number(e.target.value) : undefined})}
-                                    className="h-11 pr-16 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors"
+                                    className="h-11 pr-16 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                                   />
-                                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-400 border-l border-gray-200">
+                                  <div className="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 bg-gray-100 rounded-r-md">
                                     K/月
                                   </div>
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">学历</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">学历要求</Label>
                                 <Select
                                   value={filters.education || ""}
                                   onValueChange={(value) => setFilters({...filters, education: value || undefined})}
                                 >
-                                  <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectTrigger className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200">
                                     <SelectValue placeholder="选择学历要求" />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-white/80 backdrop-blur-xl max-h-[300px]">
-                                    <SelectItem value="1">1. 不限</SelectItem>
-                                    <SelectItem value="2">2. 初中及以下</SelectItem>
-                                    <SelectItem value="3">3. 中技</SelectItem>
-                                    <SelectItem value="4">4. 高中</SelectItem>
-                                    <SelectItem value="5">5. 中专/中技</SelectItem>
-                                    <SelectItem value="6">6. 大专</SelectItem>
-                                    <SelectItem value="7">7. 本科</SelectItem>
-                                    <SelectItem value="8">8. 硕士</SelectItem>
-                                    <SelectItem value="9">9. MBA/EMBA</SelectItem>
-                                    <SelectItem value="10">10. EMBA</SelectItem>
-                                    <SelectItem value="11">11. 博士</SelectItem>
-                                    <SelectItem value="12">12. 其他</SelectItem>
+                                  <SelectContent className="bg-white border border-gray-100 shadow-lg">
+                                    <SelectItem value="1">不限</SelectItem>
+                                    <SelectItem value="2">初中及以下</SelectItem>
+                                    <SelectItem value="3">中技</SelectItem>
+                                    <SelectItem value="4">高中</SelectItem>
+                                    <SelectItem value="5">中专/中技</SelectItem>
+                                    <SelectItem value="6">大专</SelectItem>
+                                    <SelectItem value="7">本科</SelectItem>
+                                    <SelectItem value="8">硕士</SelectItem>
+                                    <SelectItem value="9">MBA/EMBA</SelectItem>
+                                    <SelectItem value="10">EMBA</SelectItem>
+                                    <SelectItem value="11">博士</SelectItem>
+                                    <SelectItem value="12">其他</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -388,47 +400,50 @@ export default function JobsPage() {
 
                           {/* 公司和经验要求 */}
                           <div>
-                            <h3 className="text-sm font-medium text-gray-400 mb-4">公司与经验</h3>
+                            <h3 className="text-sm font-medium text-gray-400 mb-6 flex items-center">
+                              <span className="w-1 h-4 bg-purple-500 rounded-full mr-2"></span>
+                              公司与经验
+                            </h3>
                             <div className="grid grid-cols-2 gap-6">
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">公司类型</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">公司类型</Label>
                                 <Select
                                   value={filters.companyType || ""}
                                   onValueChange={(value) => setFilters({...filters, companyType: value || undefined})}
                                 >
-                                  <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectTrigger className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200">
                                     <SelectValue placeholder="选择公司类型" />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-white/80 backdrop-blur-xl max-h-[300px]">
-                                    <SelectItem value="1">1. 国企</SelectItem>
-                                    <SelectItem value="2">2. 外商独资</SelectItem>
-                                    <SelectItem value="3">3. 代表处</SelectItem>
-                                    <SelectItem value="4">4. 合资</SelectItem>
-                                    <SelectItem value="5">5. 民营</SelectItem>
-                                    <SelectItem value="6">6. 国家机关</SelectItem>
-                                    <SelectItem value="7">7. 其他</SelectItem>
-                                    <SelectItem value="8">8. 股份制企业</SelectItem>
-                                    <SelectItem value="9">9. 上市公司</SelectItem>
-                                    <SelectItem value="10">10. 事业单位</SelectItem>
-                                    <SelectItem value="11">11. 银行</SelectItem>
-                                    <SelectItem value="12">12. 医院</SelectItem>
-                                    <SelectItem value="13">13. 学校/下级学院</SelectItem>
-                                    <SelectItem value="14">14. 律师事务所</SelectItem>
-                                    <SelectItem value="15">15. 社会团体</SelectItem>
-                                    <SelectItem value="16">16. 港澳台公司</SelectItem>
+                                  <SelectContent className="bg-white border border-gray-100 shadow-lg">
+                                    <SelectItem value="1">国企</SelectItem>
+                                    <SelectItem value="2">外商独资</SelectItem>
+                                    <SelectItem value="3">代表处</SelectItem>
+                                    <SelectItem value="4">合资</SelectItem>
+                                    <SelectItem value="5">民营</SelectItem>
+                                    <SelectItem value="6">国家机关</SelectItem>
+                                    <SelectItem value="7">其他</SelectItem>
+                                    <SelectItem value="8">股份制企业</SelectItem>
+                                    <SelectItem value="9">上市公司</SelectItem>
+                                    <SelectItem value="10">事业单位</SelectItem>
+                                    <SelectItem value="11">银行</SelectItem>
+                                    <SelectItem value="12">医院</SelectItem>
+                                    <SelectItem value="13">学校/下级学院</SelectItem>
+                                    <SelectItem value="14">律师事务所</SelectItem>
+                                    <SelectItem value="15">社会团体</SelectItem>
+                                    <SelectItem value="16">港澳台公司</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">工作经验</Label>
+                              <div className="space-y-2.5">
+                                <Label className="text-sm font-medium text-gray-600">工作经验</Label>
                                 <Select
                                   value={filters.experience || ""}
                                   onValueChange={(value) => setFilters({...filters, experience: value || undefined})}
                                 >
-                                  <SelectTrigger className="h-11 bg-gray-50/50 border-gray-200 hover:border-gray-300 focus:border-blue-500 transition-colors">
+                                  <SelectTrigger className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200">
                                     <SelectValue placeholder="选择工作经验" />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-white/80 backdrop-blur-xl">
+                                  <SelectContent className="bg-white border border-gray-100 shadow-lg">
                                     <SelectItem value="fresh">应届生</SelectItem>
                                     <SelectItem value="1-3">1-3年</SelectItem>
                                     <SelectItem value="3-5">3-5年</SelectItem>
@@ -440,11 +455,11 @@ export default function JobsPage() {
                             </div>
                           </div>
 
-                          <div className="pt-6 border-t">
+                          <div className="pt-6 border-t border-gray-100">
                             <Button 
                               onClick={handleResetFilters} 
                               variant="outline" 
-                              className="w-full h-11 border-gray-200 hover:bg-gray-50 text-gray-600 hover:text-gray-900 transition-colors"
+                              className="w-full h-11 bg-gray-50 border-0 hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-all duration-200"
                             >
                               重置筛选条件
                             </Button>
@@ -530,21 +545,35 @@ export default function JobsPage() {
               {Object.values(filters).some(value => value !== undefined && value !== "" && value !== null) && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {filters.location && (
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
-                      地点: {filters.location}
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="mr-2">地点:</span>
+                      <span className="font-medium">{filters.location}</span>
                     </div>
                   )}
                   {filters.position && (
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
-                      职位: {filters.position}
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="mr-2">职位:</span>
+                      <span className="font-medium">{filters.position}</span>
                     </div>
                   )}
                   {filters.minSalary && (
-                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm">
-                      最低薪资: {filters.minSalary}k
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="mr-2">最低薪资:</span>
+                      <span className="font-medium">{filters.minSalary}k</span>
                     </div>
                   )}
-                  {/* ... 其他筛选条件标签 ... */}
+                  {filters.education && (
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="mr-2">学历:</span>
+                      <span className="font-medium">{educationMap[filters.education]}</span>
+                    </div>
+                  )}
+                  {filters.experience && (
+                    <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
+                      <span className="mr-2">经验:</span>
+                      <span className="font-medium">{experienceMap[filters.experience]}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
