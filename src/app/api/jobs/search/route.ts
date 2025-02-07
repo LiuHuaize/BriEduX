@@ -56,6 +56,31 @@ const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任
   ]
 }`;
 
+// 添加URL提取的辅助函数
+function extractUrlsFromMarkdown(text: string): Map<string, string> {
+  const urlMap = new Map<string, string>();
+  const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let match;
+
+  while ((match = markdownLinkRegex.exec(text)) !== null) {
+    const [_, title, url] = match;
+    urlMap.set(title.trim(), url.trim());
+  }
+
+  return urlMap;
+}
+
+function findUrlForJob(jobDescription: string, urlMap: Map<string, string>): string {
+  // 使用 Array.from 来避免迭代器兼容性问题
+  const entries = Array.from(urlMap.entries());
+  for (const [title, url] of entries) {
+    if (jobDescription.includes(title)) {
+      return url.replace(/\)$/, ''); // 移除可能的多余括号
+    }
+  }
+  return '';
+}
+
 export async function POST(request: Request) {
   try {
     // 解析请求体
@@ -93,6 +118,10 @@ export async function POST(request: Request) {
     
     const parsedData = JSON.parse(cozeData.data);
     console.log('解析后的 Coze 数据:', parsedData);
+
+    // 从原始文本中提取URL映射
+    const urlMap = extractUrlsFromMarkdown(parsedData.output);
+    console.log('提取到的URL映射:', Object.fromEntries(urlMap));
     
     // 使用 Deepseek API 解析数据
     const completion = await client.chat.completions.create({
@@ -109,7 +138,7 @@ export async function POST(request: Request) {
       ],
       temperature: 0.1,
       max_tokens: 2000,
-      response_format: { type: "json_object" } // 确保返回JSON格式
+      response_format: { type: "json_object" }
     });
 
     const content = completion.choices[0].message.content;
@@ -119,17 +148,26 @@ export async function POST(request: Request) {
     
     console.log('Deepseek API 返回内容:', content);
     
-    // 尝试解析JSON，确保返回的是有效的JSON
     let jobListings;
     try {
-      // 如果返回的内容包含markdown标记，尝试提取JSON部分
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch ? jsonMatch[0] : content;
       jobListings = JSON.parse(jsonStr);
       
+      // 补充或修正URL
+      if (jobListings.jobs && Array.isArray(jobListings.jobs)) {
+        jobListings.jobs = jobListings.jobs.map((job: JobInfo) => {
+          if (!job.url) {
+            // 尝试从职位描述中找到对应的URL
+            const jobDescription = `${job.position}：${job.company}招聘，工作地点在${job.location}，薪资为${job.salary}`;
+            job.url = findUrlForJob(jobDescription, urlMap);
+          }
+          return job;
+        });
+      }
+
       console.log('解析后的工作列表:', jobListings);
       
-      // 验证解析后的数据
       if (!jobListings.jobs || !Array.isArray(jobListings.jobs)) {
         throw new Error('解析结果格式不正确');
       }
@@ -165,6 +203,6 @@ export async function POST(request: Request) {
 curl -X POST 'http://localhost:3000/api/jobs/search' \
 -H "Content-Type: application/json" \
 -d '{
-  "query": "重庆，律师，30000工资以上"
+  "query": "重庆，律师，3000工资以上"
 }'
 */ 
