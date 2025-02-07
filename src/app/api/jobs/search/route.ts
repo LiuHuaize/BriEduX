@@ -71,13 +71,14 @@ function extractUrlsFromMarkdown(text: string): Map<string, string> {
 }
 
 function findUrlForJob(jobDescription: string, urlMap: Map<string, string>): string {
-  // 使用 Array.from 来避免迭代器兼容性问题
   const entries = Array.from(urlMap.entries());
+  
   for (const [title, url] of entries) {
     if (jobDescription.includes(title)) {
-      return url.replace(/\)$/, ''); // 移除可能的多余括号
+      return url.replace(/\)$/, '');
     }
   }
+  
   return '';
 }
 
