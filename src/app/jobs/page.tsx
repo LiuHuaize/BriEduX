@@ -72,6 +72,7 @@ interface JobInfo {
   location: string;
   salary: string;
   url: string;
+  description?: string;
 }
 
 // Supabase 客户端配置 - 使用 anon key 用于基本操作
@@ -135,6 +136,8 @@ export default function JobsPage() {
     type: 'info' | 'success' | 'error';
   }>>([]);
   const [searchMessage, setSearchMessage] = useState<string>("");
+  const [loadingDescriptions, setLoadingDescriptions] = useState<{ [key: string]: boolean }>({});
+  const [expandedJob, setExpandedJob] = useState<string | null>(null);
 
   // 添加日志
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -281,6 +284,7 @@ export default function JobsPage() {
     setSearchError(null);
     setSearchResults([]);
     setSearchMessage("");
+    setLoadingDescriptions({});
 
     try {
       const response = await fetch('/api/jobs/search', {
@@ -298,10 +302,17 @@ export default function JobsPage() {
       }
 
       if (data.success) {
+        // 设置基本搜索结果
         setSearchResults(data.data || []);
         if (data.output) {
           setSearchMessage(data.output);
         }
+
+        // 自动开始加载所有岗位描述
+        data.data.forEach(job => {
+          setLoadingDescriptions(prev => ({ ...prev, [job.url]: true }));
+          handleLoadDescription(job);
+        });
       } else {
         throw new Error('返回数据格式不正确');
       }
@@ -323,6 +334,39 @@ export default function JobsPage() {
       experience: undefined,
       keywords: [],
     });
+  };
+
+  // 添加加载描述的处理函数
+  const handleLoadDescription = async (job: JobInfo) => {
+    if (job.description || loadingDescriptions[job.url]) return;
+    
+    setLoadingDescriptions(prev => ({ ...prev, [job.url]: true }));
+    try {
+      const descResponse = await fetch('/api/jobs/description', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: job.url }),
+      });
+
+      if (descResponse.ok) {
+        const descData = await descResponse.json();
+        if (descData.success && descData.data.description) {
+          setSearchResults(prev => 
+            prev.map(j => 
+              j.url === job.url 
+                ? { ...j, description: descData.data.description }
+                : j
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error('获取岗位描述失败:', error);
+    } finally {
+      setLoadingDescriptions(prev => ({ ...prev, [job.url]: false }));
+    }
   };
 
   return (
@@ -756,40 +800,62 @@ export default function JobsPage() {
                   <div className="grid gap-4">
                     {searchResults.map((job, index) => (
                       <Card key={index} className="hover:shadow-lg transition-shadow duration-300">
-                        <CardHeader>
-                          <CardTitle className="flex items-center justify-between">
-                            <span className="text-xl font-semibold text-gray-900">{job.position}</span>
-                            <span className="text-lg font-bold text-blue-600">{job.salary}</span>
-                          </CardTitle>
-                          <CardDescription className="text-base text-gray-600">
-                            {job.company}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="flex flex-wrap gap-4 text-gray-600">
-                            <div className="flex items-center">
-                              <Building2 className="w-4 h-4 mr-2" />
-                              <span>{job.company}</span>
+                        <div className="flex flex-col md:flex-row">
+                          {/* 左侧基本信息 */}
+                          <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
+                            <div className="flex justify-between items-start mb-4">
+                              <div>
+                                <h3 className="text-xl font-semibold text-gray-900">{job.position}</h3>
+                                <p className="text-base text-gray-600 mt-1">{job.company}</p>
+                              </div>
+                              <span className="text-lg font-bold text-blue-600">{job.salary}</span>
                             </div>
-                            <div className="flex items-center">
-                              <MapPin className="w-4 h-4 mr-2" />
-                              <span>{job.location}</span>
+                            <div className="space-y-3">
+                              <div className="flex items-center text-gray-600">
+                                <Building2 className="w-4 h-4 mr-2" />
+                                <span>{job.company}</span>
+                              </div>
+                              <div className="flex items-center text-gray-600">
+                                <MapPin className="w-4 h-4 mr-2" />
+                                <span>{job.location}</span>
+                              </div>
+                              <div className="flex items-center justify-end mt-4">
+                                <a
+                                  href={job.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-blue-600 hover:text-blue-700"
+                                >
+                                  <ExternalLink className="w-4 h-4 mr-1" />
+                                  查看原文
+                                </a>
+                              </div>
                             </div>
-                            <div className="flex items-center">
-                              <DollarSign className="w-4 h-4 mr-2" />
-                              <span>{job.salary}</span>
-                            </div>
-                            <a
-                              href={job.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center text-blue-600 hover:text-blue-700 transition-colors ml-auto"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-2" />
-                              查看详情
-                            </a>
                           </div>
-                        </CardContent>
+
+                          {/* 右侧岗位描述 */}
+                          <div className="flex-1 p-6">
+                            <div className="h-full">
+                              <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
+                              <div className="relative min-h-[200px]">
+                                {loadingDescriptions[job.url] ? (
+                                  <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
+                                    <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                    <p className="text-sm text-gray-500">正在加载岗位描述...</p>
+                                  </div>
+                                ) : job.description ? (
+                                  <div className="animate-fadeIn">
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center h-full text-gray-500">
+                                    暂无岗位描述
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </Card>
                     ))}
                   </div>
