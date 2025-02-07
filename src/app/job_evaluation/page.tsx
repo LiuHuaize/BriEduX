@@ -9,26 +9,73 @@ const JobEvaluation = () => {
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setResumeFile(file);
+      setError(null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // 这里模拟API调用
-    setTimeout(() => {
-      setIsLoading(false);
-      setEvaluationResult({
-        score: 85,
-        strengths: ["技能匹配度高", "项目经验丰富", "教育背景相关"],
-        improvements: ["可以增加更多量化成果", "建议添加相关证书"],
+    setError(null);
+
+    try {
+      // 读取文件内容
+      const resumeContent = await readFileContent(resumeFile);
+      
+      // 调用API
+      const response = await fetch('/api/aihubmix', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          resumeContent,
+          jobDescription,
+        }),
       });
-    }, 2000);
+
+      if (!response.ok) {
+        throw new Error('评测请求失败');
+      }
+
+      const result = await response.json();
+      
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setEvaluationResult(result);
+    } catch (err: any) {
+      setError(err.message || '评测过程中发生错误');
+      console.error('Evaluation error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 读取文件内容的辅助函数
+  const readFileContent = (file: File | null): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        reject(new Error('请先上传简历文件'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve(e.target?.result as string);
+      };
+      reader.onerror = () => {
+        reject(new Error('文件读取失败'));
+      };
+      reader.readAsText(file);
+    });
   };
 
   return (
@@ -66,7 +113,7 @@ const JobEvaluation = () => {
                     onChange={handleFileUpload}
                     className="hidden"
                     id="resume-upload"
-                    accept=".pdf,.doc,.docx"
+                    accept=".pdf,.doc,.docx,.txt"
                   />
                   <div className="mb-6 p-4 bg-blue-50 rounded-full group-hover:scale-110 transition-transform">
                     <UploadCloud className="w-8 h-8 text-blue-500" />
@@ -75,7 +122,7 @@ const JobEvaluation = () => {
                     {resumeFile ? resumeFile.name : "上传您的简历"}
                   </h3>
                   <p className="text-sm text-gray-500">
-                    支持 PDF、Word 格式文件
+                    支持 PDF、Word、TXT 格式文件
                   </p>
                 </div>
               </div>
@@ -99,6 +146,13 @@ const JobEvaluation = () => {
                 />
               </div>
             </div>
+
+            {/* 错误提示 */}
+            {error && (
+              <div className="bg-red-50 text-red-600 p-4 rounded-xl text-center">
+                {error}
+              </div>
+            )}
 
             {/* 提交按钮 */}
             <div className="flex justify-center">
