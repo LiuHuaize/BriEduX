@@ -16,6 +16,10 @@ const JobEvaluation = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [filePath, setFilePath] = useState<string | null>(null);
+  const [conversionResult, setConversionResult] = useState<string | null>(null);
+  const [conversionLoading, setConversionLoading] = useState(false);
+  const [conversionError, setConversionError] = useState<string | null>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -61,8 +65,9 @@ const JobEvaluation = () => {
           throw new Error(result.error);
         }
 
-        // 保存文件的公共URL
+        // 保存文件的公共URL和存储路径
         setFileUrl(result.data.publicUrl);
+        setFilePath(filePath);
         
         setUploadProgress(100);
         setUploadStatus('success');
@@ -116,6 +121,33 @@ const JobEvaluation = () => {
       reader.onerror = () => reject(new Error('文件读取失败'));
       reader.readAsText(file);
     });
+  };
+
+  const handleConvertPDF = async () => {
+    if (!filePath) {
+      toast.error('无效的文件路径');
+      return;
+    }
+    setConversionLoading(true);
+    setConversionResult(null);
+    setConversionError(null);
+    try {
+      const response = await fetch('/api/convert_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        setConversionError(data.error);
+      } else {
+        setConversionResult(data.markdown);
+      }
+    } catch (error: any) {
+      setConversionError(error.message || '转换出错');
+    } finally {
+      setConversionLoading(false);
+    }
   };
 
   return (
@@ -342,6 +374,31 @@ const JobEvaluation = () => {
               </div>
             </div>
           </motion.div>
+        )}
+
+        {resumeFile && resumeFile.name.toLowerCase().endsWith('.pdf') && uploadStatus === 'success' && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={handleConvertPDF}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              {conversionLoading ? "转换中..." : "转换PDF"}
+            </button>
+          </div>
+        )}
+
+        {conversionError && (
+          <div className="mt-4 p-4 bg-red-50 rounded-lg text-red-600">
+            {conversionError}
+          </div>
+        )}
+
+        {conversionResult && (
+          <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+            <h3 className="text-lg font-medium text-gray-700">转换结果</h3>
+            <pre className="text-sm text-gray-800 whitespace-pre-wrap">{conversionResult}</pre>
+          </div>
         )}
       </div>
     </div>
