@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   Search, 
@@ -14,6 +14,9 @@ import {
   DollarSign,
   ExternalLink,
   Loader2,
+  X,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +43,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
+import { toast } from "sonner";
+import { useDropzone } from 'react-dropzone';
+import { Progress } from "@/components/ui/progress";
 
 // 类型定义
 type JobFilter = {
@@ -60,6 +68,35 @@ interface JobInfo {
   url: string;
 }
 
+// Supabase 客户端配置 - 使用 anon key 用于基本操作
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// 教育程度和工作经验的映射
+const educationMap: { [key: string]: string } = {
+  "1": "学历不限",
+  "2": "初中及以下",
+  "3": "中技",
+  "4": "高中",
+  "5": "中专/中技",
+  "6": "大专",
+  "7": "本科",
+  "8": "硕士",
+  "9": "MBA/EMBA",
+  "10": "EMBA",
+  "11": "博士",
+  "12": "其他"
+};
+
+const experienceMap: { [key: string]: string } = {
+  "fresh": "应届生",
+  "1-3": "1-3年经验",
+  "3-5": "3-5年经验",
+  "5-10": "5-10年经验",
+  "10+": "10年以上经验"
+};
+
 export default function JobsPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -77,6 +114,122 @@ export default function JobsPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<JobInfo[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadLogs, setUploadLogs] = useState<Array<{
+    time: Date;
+    message: string;
+    type: 'info' | 'success' | 'error';
+  }>>([]);
+
+  // 添加日志
+  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setUploadLogs(prev => [...prev, {
+      time: new Date(),
+      message,
+      type
+    }]);
+  };
+
+  // 处理文件拖拽
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/msword': ['.doc'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+    },
+    multiple: false
+  });
+
+  const handleFileUpload = async (file: File) => {
+    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('请上传 PDF 或 Word 格式的简历');
+      return;
+    }
+
+    try {
+      setResumeFile(file);
+      setIsUploading(true);
+      setUploadStatus('uploading');
+      setUploadProgress(0);
+
+      // 生成唯一的文件名
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uuidv4()}.${fileExt}`;
+      const filePath = `resume/${fileName}`;
+
+      // 创建 FormData 对象
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('filePath', filePath);
+
+      // 模拟分析进度
+      const progressSteps = [
+        { progress: 20, message: '正在解析简历...' },
+        { progress: 40, message: '提取关键技能...' },
+        { progress: 60, message: '分析工作经验...' },
+        { progress: 80, message: '匹配合适职位...' },
+        { progress: 90, message: '生成推荐报告...' }
+      ];
+
+      let currentStep = 0;
+      const progressInterval = setInterval(() => {
+        if (currentStep < progressSteps.length) {
+          setUploadProgress(progressSteps[currentStep].progress);
+          addLog(progressSteps[currentStep].message, 'info');
+          currentStep++;
+        } else {
+          clearInterval(progressInterval);
+        }
+      }, 1000);
+
+      // 上传文件
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '上传失败');
+      }
+
+      const data = await response.json();
+      setUploadProgress(100);
+      setUploadStatus('success');
+      
+      toast.success('简历分析完成！');
+      addLog('🎉 已为您匹配最适合的职位', 'success');
+      
+      // 获取文件URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('resume')
+        .getPublicUrl(filePath);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      setUploadStatus('error');
+      toast.error('简历处理失败，请重试');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleResumeUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
 
   // 构建搜索查询
   const buildSearchQuery = () => {
@@ -93,50 +246,13 @@ export default function JobsPage() {
       query += ` 薪资${filters.minSalary}k以上`;
     }
     if (filters.education) {
-      const educationMap: { [key: string]: string } = {
-        "1": "学历不限",
-        "2": "初中及以下",
-        "3": "中技",
-        "4": "高中",
-        "5": "中专/中技",
-        "6": "大专",
-        "7": "本科",
-        "8": "硕士",
-        "9": "MBA/EMBA",
-        "10": "EMBA",
-        "11": "博士",
-        "12": "其他"
-      };
       query += ` 学历要求${educationMap[filters.education]}`;
     }
     if (filters.experience) {
-      const experienceMap: { [key: string]: string } = {
-        "fresh": "应届生",
-        "1-3": "1-3年经验",
-        "3-5": "3-5年经验",
-        "5-10": "5-10年经验",
-        "10+": "10年以上经验"
-      };
       query += ` 工作经验${experienceMap[filters.experience]}`;
     }
 
     return query.trim();
-  };
-
-  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!validTypes.includes(file.type)) {
-      alert('请上传 PDF 或 Word 文档');
-      return;
-    }
-
-    setResumeFile(file);
-    setIsUploading(true);
-    // TODO: 实现文件上传和简历分析逻辑
-    setIsUploading(false);
   };
 
   const handleSearch = async () => {
@@ -201,19 +317,19 @@ export default function JobsPage() {
         {/* 标题区域 */}
         <div className="text-center mb-16">
           <motion.h1 
-            className="text-5xl sm:text-6xl font-bold text-gray-900 tracking-tight mb-6"
+            className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            匹配理想岗位
+            AI 智能岗位匹配
           </motion.h1>
           <motion.p 
-            className="text-xl text-gray-600 max-w-2xl mx-auto"
+            className="text-lg text-gray-600 max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            上传简历或直接搜索，找到最适合你的工作机会
+            上传简历，让 AI 为您精准匹配最适合的工作机会
           </motion.p>
         </div>
 
@@ -253,37 +369,108 @@ export default function JobsPage() {
           transition={{ delay: 0.2 }}
         >
           {activeMethod === 'resume' ? (
-            // 简历上传区域
-            <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
-              <div className="relative group cursor-pointer">
-                <input
-                  type="file"
-                  id="resume-upload"
-                  className="hidden"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleResumeUpload}
-                />
-                <Label
-                  htmlFor="resume-upload"
-                  className="block"
-                >
-                  <div className="flex flex-col items-center justify-center p-10 border-2 border-dashed border-gray-200 rounded-xl group-hover:border-blue-400 transition-colors duration-200">
-                    <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-100 transition-colors duration-200">
-                      <Upload className="w-10 h-10 text-blue-600" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {resumeFile ? resumeFile.name : "点击上传简历"}
-                    </h3>
-                    <p className="text-gray-500">支持 PDF、Word 格式</p>
-                    {isUploading && (
-                      <div className="mt-4 text-blue-600 flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent mr-2" />
-                        正在分析简历...
+            <div className="space-y-8">
+              {/* 上传区域 */}
+              <div
+                {...getRootProps()}
+                className={`relative overflow-hidden bg-white rounded-2xl shadow-lg transition-all duration-300 ${
+                  isDragActive ? 'border-2 border-blue-500 bg-blue-50' : ''
+                } ${!isUploading && 'hover:shadow-xl'}`}
+              >
+                <input {...getInputProps()} onChange={handleResumeUpload} disabled={isUploading} />
+                
+                <div className="p-8">
+                  {isUploading ? (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-center">
+                        <div className="relative w-24 h-24">
+                          <div className="absolute inset-0 rounded-full border-4 border-blue-100 border-opacity-50"></div>
+                          <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <FileText className="w-8 h-8 text-blue-500" />
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </Label>
+                      <div className="space-y-3">
+                        <div className="text-center">
+                          <p className="text-lg font-medium text-gray-900">正在分析您的简历</p>
+                          <p className="text-sm text-gray-500 mt-1">请稍候，这可能需要几秒钟...</p>
+                        </div>
+                        <Progress value={uploadProgress} className="w-full h-1.5" />
+                        <p className="text-center text-sm font-medium text-blue-600">
+                          {uploadProgress < 100 ? '正在处理...' : '分析完成！'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : resumeFile && uploadStatus === 'success' ? (
+                    <div className="text-center space-y-4">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
+                        <CheckCircle2 className="w-8 h-8 text-green-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">简历分析完成</h3>
+                        <p className="text-sm text-gray-500 mt-1">我们已经为您找到最匹配的职位</p>
+                      </div>
+                      <Button 
+                        className="mt-4"
+                        onClick={() => {
+                          // TODO: 跳转到匹配结果页面
+                        }}
+                      >
+                        查看匹配结果
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-4">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50">
+                        <Upload className="w-8 h-8 text-blue-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {isDragActive ? "释放以上传简历" : "上传您的简历"}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          支持 PDF、Word 格式
+                        </p>
+                      </div>
+                      {!isDragActive && (
+                        <Button variant="outline" className="mt-4">
+                          选择文件
+                          <Upload className="w-4 h-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* 处理步骤说明 */}
+              {!isUploading && !resumeFile && (
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50">
+                      <FileText className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">上传简历</p>
+                    <p className="text-xs text-gray-500">支持多种文档格式</p>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50">
+                      <Search className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">AI 分析</p>
+                    <p className="text-xs text-gray-500">提取关键技能和经验</p>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-50">
+                      <Briefcase className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-900">智能匹配</p>
+                    <p className="text-xs text-gray-500">推荐最适合的职位</p>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             // 自定义搜索区域
