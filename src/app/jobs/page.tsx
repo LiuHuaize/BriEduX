@@ -17,6 +17,7 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 import { useDropzone } from 'react-dropzone';
 import { Progress } from "@/components/ui/progress";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 
 // 类型定义
 type JobFilter = {
@@ -97,6 +103,13 @@ const experienceMap: { [key: string]: string } = {
   "10+": "10年以上经验"
 };
 
+interface SearchResponse {
+  success: boolean;
+  data: JobInfo[];
+  message?: string;
+  output?: string;
+}
+
 export default function JobsPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -121,6 +134,7 @@ export default function JobsPage() {
     message: string;
     type: 'info' | 'success' | 'error';
   }>>([]);
+  const [searchMessage, setSearchMessage] = useState<string>("");
 
   // 添加日志
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -266,6 +280,7 @@ export default function JobsPage() {
     setIsSearching(true);
     setSearchError(null);
     setSearchResults([]);
+    setSearchMessage("");
 
     try {
       const response = await fetch('/api/jobs/search', {
@@ -276,14 +291,17 @@ export default function JobsPage() {
         body: JSON.stringify({ query: finalQuery }),
       });
 
-      const data = await response.json();
+      const data: SearchResponse = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || '搜索失败');
+        throw new Error(data.message || '搜索失败');
       }
 
-      if (data.success && Array.isArray(data.data)) {
-        setSearchResults(data.data);
+      if (data.success) {
+        setSearchResults(data.data || []);
+        if (data.output) {
+          setSearchMessage(data.output);
+        }
       } else {
         throw new Error('返回数据格式不正确');
       }
@@ -435,9 +453,9 @@ export default function JobsPage() {
                         </p>
                       </div>
                       {!isDragActive && (
-                        <Button variant="outline" className="mt-4">
+                        <Button variant="outline" className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                          <Upload className="w-4 h-4 mr-2" />
                           选择文件
-                          <Upload className="w-4 h-4 ml-2" />
                         </Button>
                       )}
                     </div>
@@ -677,9 +695,59 @@ export default function JobsPage() {
 
               {/* 搜索结果展示 */}
               {searchError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600">
-                  {searchError}
-                </div>
+                <Alert variant="destructive" className="mt-6">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>搜索出错</AlertTitle>
+                  <AlertDescription>{searchError}</AlertDescription>
+                </Alert>
+              )}
+
+              {!searchError && searchMessage && searchResults.length === 0 && (
+                <Alert className="mt-6 bg-blue-50 border-blue-200">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <AlertTitle className="text-blue-700">AI 智能建议</AlertTitle>
+                  <AlertDescription className="text-blue-600 mt-2">
+                    {searchMessage}
+                  </AlertDescription>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => {
+                        // 清除薪资筛选
+                        setFilters(prev => ({
+                          ...prev,
+                          minSalary: undefined
+                        }));
+                      }}
+                    >
+                      清除薪资筛选
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => {
+                        // 清除地点筛选
+                        setFilters(prev => ({
+                          ...prev,
+                          location: ""
+                        }));
+                      }}
+                    >
+                      清除地点筛选
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={handleResetFilters}
+                    >
+                      重置所有筛选
+                    </Button>
+                  </div>
+                </Alert>
               )}
 
               {searchResults.length > 0 && (
