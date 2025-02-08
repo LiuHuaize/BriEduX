@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       "score": 分数(0-100),
       "strengths": ["优势1", "优势2", "优势3"],
       "improvements": ["建议1", "建议2"],
-      "summary": "综合评价和建议"
+      "summary": "综合评价和建议，需要一个具体的包括改进方案和一些推荐的建议，大概400字左右，纯文本格式，注意分行，不要markdown格式，不要包含*这种"
     }`;
 
     console.log('开始调用 AI API...');

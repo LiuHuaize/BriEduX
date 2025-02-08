@@ -454,17 +454,17 @@ const JobEvaluation = () => {
             </div>
 
             {/* 评估结果内容 */}
-            <div className="space-y-6">
+            <div className="space-y-8">
               {/* 分数展示 */}
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-8">
                 <div className="flex flex-col items-center">
-                  <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
+                  <div className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
                     {activeTab === 'resume' 
                       ? evaluationResults.resumeEvaluation?.score || 0
                       : evaluationResults.jobEvaluation?.score || 0}
-                    <span className="text-base text-gray-400 ml-1">分</span>
+                    <span className="text-lg text-gray-400 ml-1">分</span>
                   </div>
-                  <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
+                  <div className="w-full max-w-sm h-2 bg-gray-100 rounded-full overflow-hidden mt-4">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ 
@@ -476,48 +476,55 @@ const JobEvaluation = () => {
                       className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
                     />
                   </div>
+                  <p className="mt-3 text-sm text-gray-500">
+                    {activeTab === 'resume' ? '简历完整度评分' : '岗位匹配度评分'}
+                  </p>
                 </div>
               </div>
 
               {/* 优势和建议展示 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* 优势展示 */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-8">
+                  <h3 className="flex items-center gap-3 text-base font-medium text-gray-900 mb-6">
+                    <div className="p-2 bg-green-50 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    </div>
                     优势分析
                   </h3>
-                  <ul className="space-y-2">
+                  <ul className="space-y-4">
                     {(activeTab === 'resume' 
                       ? evaluationResults.resumeEvaluation?.strengths 
                       : evaluationResults.jobEvaluation?.strengths)?.map((strength: string, index: number) => (
                       <li 
                         key={index}
-                        className="flex items-start gap-2 text-sm text-gray-600"
+                        className="flex items-start gap-3 p-3 bg-green-50/50 rounded-xl"
                       >
-                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
-                        {strength}
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 leading-relaxed">{strength}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
                 {/* 改进建议展示 */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-8">
+                  <h3 className="flex items-center gap-3 text-base font-medium text-gray-900 mb-6">
+                    <div className="p-2 bg-amber-50 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-amber-500" />
+                    </div>
                     改进建议
                   </h3>
-                  <ul className="space-y-2">
+                  <ul className="space-y-4">
                     {(activeTab === 'resume'
                       ? evaluationResults.resumeEvaluation?.improvements
                       : evaluationResults.jobEvaluation?.improvements)?.map((improvement: string, index: number) => (
                       <li 
                         key={index}
-                        className="flex items-start gap-2 text-sm text-gray-600"
+                        className="flex items-start gap-3 p-3 bg-amber-50/50 rounded-xl"
                       >
-                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                        {improvement}
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 leading-relaxed">{improvement}</span>
                       </li>
                     ))}
                   </ul>
@@ -526,16 +533,25 @@ const JobEvaluation = () => {
 
               {/* 综合评价 */}
               {((activeTab === 'resume' ? evaluationResults.resumeEvaluation?.summary : evaluationResults.jobEvaluation?.summary) || '') && (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                    <LineChart className="w-5 h-5 text-blue-500" />
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-8">
+                  <h3 className="flex items-center gap-3 text-base font-medium text-gray-900 mb-6">
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                      <LineChart className="w-5 h-5 text-blue-500" />
+                    </div>
                     综合评价
                   </h3>
-                  <p className="text-sm text-gray-600">
-                    {activeTab === 'resume' 
+                  <div className="space-y-4 text-gray-700">
+                    {(activeTab === 'resume' 
                       ? evaluationResults.resumeEvaluation?.summary 
-                      : evaluationResults.jobEvaluation?.summary}
-                  </p>
+                      : evaluationResults.jobEvaluation?.summary)
+                      ?.split('\n')
+                      .map((paragraph, index) => (
+                        <p key={index} className="text-sm leading-relaxed">
+                          {paragraph}
+                        </p>
+                      ))
+                    }
+                  </div>
                 </div>
               )}
             </div>
