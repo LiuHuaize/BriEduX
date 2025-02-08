@@ -7,11 +7,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 
+interface EvaluationResult {
+  score: number;
+  strengths: string[];
+  improvements: string[];
+}
+
 const JobEvaluation = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [evaluationResult, setEvaluationResult] = useState<any>(null);
+  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -86,41 +92,132 @@ const JobEvaluation = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    console.log('开始提交评估请求...');
 
     try {
       if (!resumeFile || !fileUrl) {
         throw new Error('请先上传简历文件');
       }
-
-      const response = await fetch('/api/aihubmix', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          resumeContent: await readFileContent(resumeFile),
-          jobDescription,
-          fileUrl 
-        }),
+      console.log('文件信息:', { 
+        fileName: resumeFile.name,
+        fileUrl,
+        filePath,
+        hasConversionResult: !!conversionResult 
       });
 
-      if (!response.ok) throw new Error('评测请求失败');
-      const result = await response.json();
-      if (result.error) throw new Error(result.error);
-      setEvaluationResult(result);
+      // 首先获取简历内容
+      let resumeContent = '';
+      if (conversionResult) {
+        console.log('使用已有的转换结果');
+        resumeContent = conversionResult;
+      } else {
+        console.log('开始转换PDF文件...');
+        const response = await fetch('/api/convert_pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filePath }),
+        });
+        const data = await response.json();
+        console.log('PDF转换结果:', data);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        resumeContent = data.markdown;
+        setConversionResult(data.markdown);
+      }
+      console.log('简历内容长度:', resumeContent.length);
+      console.log('简历内容预览:', resumeContent.substring(0, 200) + '...');
+
+      // 调用评估 API
+      let evaluationResponse;
+      if (jobDescription) {
+        console.log('开始岗位匹配评估...');
+        console.log('岗位要求:', jobDescription);
+        evaluationResponse = await fetch('/api/job_evaluation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            resumeContent,
+            jobDescription
+          }),
+        });
+      } else {
+        console.log('开始简历评估...');
+        evaluationResponse = await fetch('/api/resume_evaluation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            resumeContent
+          }),
+        });
+      }
+
+      console.log('评估API响应状态:', evaluationResponse.status);
+      if (!evaluationResponse.ok) {
+        throw new Error(`评测请求失败: ${evaluationResponse.status}`);
+      }
+
+      const result = await evaluationResponse.json();
+      console.log('API 原始响应:', result);
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      // 从返回的文本中提取 JSON 字符串
+      let evaluationData: EvaluationResult;
+      try {
+        const jsonMatch = result.data.match(/```json\n([\s\S]*?)\n```/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1];
+          console.log('提取的 JSON 字符串:', jsonStr);
+          const parsedData = JSON.parse(jsonStr);
+          console.log('解析后的 JSON 数据:', parsedData);
+          
+          evaluationData = {
+            score: typeof parsedData.score === 'number' ? parsedData.score : 0,
+            strengths: Array.isArray(parsedData.strengths) ? parsedData.strengths : [],
+            improvements: Array.isArray(parsedData.improvements) ? parsedData.improvements : []
+          };
+        } else {
+          console.error('无法从响应中提取 JSON');
+          evaluationData = {
+            score: 0,
+            strengths: [],
+            improvements: ['无法解析评估结果，请重试']
+          };
+        }
+      } catch (e) {
+        console.error('JSON 解析错误:', e);
+        evaluationData = {
+          score: 0,
+          strengths: [],
+          improvements: ['评估结果解析失败，请重试']
+        };
+      }
+
+      console.log('处理后的评估数据:', evaluationData);
+      console.log('分数:', evaluationData.score);
+      console.log('优势数量:', evaluationData.strengths.length);
+      console.log('建议数量:', evaluationData.improvements.length);
+
+      setEvaluationResult(evaluationData);
+      toast.success('评估完成！');
+
     } catch (err: any) {
-      setError(err.message || '评测过程中发生错误');
-      console.error('Evaluation error:', err);
+      const errorMessage = err.message || '评测过程中发生错误';
+      console.error('评估错误:', {
+        message: errorMessage,
+        error: err,
+        stack: err.stack
+      });
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
+      console.log('评估流程结束');
     }
-  };
-
-  const readFileContent = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = () => reject(new Error('文件读取失败'));
-      reader.readAsText(file);
-    });
   };
 
   const handleConvertPDF = async () => {
@@ -313,17 +410,23 @@ const JobEvaluation = () => {
             animate={{ opacity: 1, y: 0 }}
             className="mt-8"
           >
+            {/* 开发环境下打印日志 */}
+            {process.env.NODE_ENV === 'development' && (() => {
+              console.log('渲染评估结果:', evaluationResult);
+              return null;
+            })()}
+            
             {/* 分数展示 */}
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6 mb-6">
               <div className="flex flex-col items-center">
                 <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
-                  {evaluationResult.score}
+                  {evaluationResult.score || 0}
                   <span className="text-base text-gray-400 ml-1">分</span>
                 </div>
                 <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${evaluationResult.score}%` }}
+                    animate={{ width: `${evaluationResult.score || 0}%` }}
                     transition={{ duration: 1, ease: "easeOut" }}
                     className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
                   />
@@ -333,45 +436,59 @@ const JobEvaluation = () => {
 
             {/* 详细分析 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100">
-                    <CheckCircle2 className="w-3 h-3 text-green-600" />
-                  </div>
-                  优势亮点
-                </h3>
-                <ul className="space-y-2">
-                  {evaluationResult.strengths.map((strength: string, index: number) => (
-                    <li 
-                      key={index}
-                      className="flex items-start gap-2 p-2.5 bg-green-50/50 rounded-xl"
-                    >
-                      <span className="w-1 h-1 mt-1.5 bg-green-500 rounded-full flex-shrink-0" />
-                      <span className="text-xs text-gray-600">{strength}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* 优势展示 */}
+              {evaluationResult.strengths?.length > 0 ? (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
+                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100">
+                      <CheckCircle2 className="w-3 h-3 text-green-600" />
+                    </div>
+                    优势亮点
+                  </h3>
+                  <ul className="space-y-2">
+                    {evaluationResult.strengths.map((strength: string, index: number) => (
+                      <li 
+                        key={index}
+                        className="flex items-start gap-2 p-2.5 bg-green-50/50 rounded-xl"
+                      >
+                        <span className="w-1 h-1 mt-1.5 bg-green-500 rounded-full flex-shrink-0" />
+                        <span className="text-xs text-gray-600">{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
+                  <p className="text-gray-500 text-sm">暂无优势分析</p>
+                </div>
+              )}
 
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-100">
-                    <AlertCircle className="w-3 h-3 text-orange-600" />
-                  </div>
-                  改进建议
-                </h3>
-                <ul className="space-y-2">
-                  {evaluationResult.improvements.map((improvement: string, index: number) => (
-                    <li 
-                      key={index}
-                      className="flex items-start gap-2 p-2.5 bg-orange-50/50 rounded-xl"
-                    >
-                      <span className="w-1 h-1 mt-1.5 bg-orange-500 rounded-full flex-shrink-0" />
-                      <span className="text-xs text-gray-600">{improvement}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {/* 改进建议展示 */}
+              {evaluationResult.improvements?.length > 0 ? (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
+                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-100">
+                      <AlertCircle className="w-3 h-3 text-orange-600" />
+                    </div>
+                    改进建议
+                  </h3>
+                  <ul className="space-y-2">
+                    {evaluationResult.improvements.map((improvement: string, index: number) => (
+                      <li 
+                        key={index}
+                        className="flex items-start gap-2 p-2.5 bg-orange-50/50 rounded-xl"
+                      >
+                        <span className="w-1 h-1 mt-1.5 bg-orange-500 rounded-full flex-shrink-0" />
+                        <span className="text-xs text-gray-600">{improvement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
+                  <p className="text-gray-500 text-sm">暂无改进建议</p>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
