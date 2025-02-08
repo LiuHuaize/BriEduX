@@ -55,7 +55,8 @@ export async function POST(request: Request) {
     {
       "score": 分数(0-100),
       "strengths": ["优势1", "优势2", "优势3"],
-      "improvements": ["建议1", "建议2"]
+      "improvements": ["建议1", "建议2"],
+      "summary": "综合评价和建议"
     }`;
 
     console.log('开始调用 AI API...');
@@ -79,66 +80,10 @@ export async function POST(request: Request) {
       throw new Error('API 返回结果为空');
     }
 
-    console.log('原始返回结果:', result);
-
-    try {
-      // 尝试解析 JSON
-      const parsedResult = JSON.parse(result);
-      console.log('解析后的结果:', parsedResult);
-      
-      // 验证数据格式
-      if (typeof parsedResult.score !== 'number' || 
-          !Array.isArray(parsedResult.strengths) || 
-          !Array.isArray(parsedResult.improvements)) {
-        console.error('数据格式不正确:', parsedResult);
-        throw new Error('返回数据格式不正确');
-      }
-
-      // 确保分数在 0-100 范围内
-      parsedResult.score = Math.max(0, Math.min(100, parsedResult.score));
-
-      return NextResponse.json({
-        success: true,
-        data: parsedResult
-      });
-    } catch (e) {
-      console.error('JSON 解析错误:', e);
-      console.log('尝试提取 JSON 字符串...');
-      
-      // 尝试从文本中提取 JSON
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          const extractedJson = JSON.parse(jsonMatch[0]);
-          console.log('提取的 JSON:', extractedJson);
-          
-          // 构造标准格式的响应
-          const standardResponse = {
-            score: typeof extractedJson.score === 'number' ? Math.max(0, Math.min(100, extractedJson.score)) : 0,
-            strengths: Array.isArray(extractedJson.strengths) ? extractedJson.strengths : [],
-            improvements: Array.isArray(extractedJson.improvements) ? extractedJson.improvements : []
-          };
-
-          return NextResponse.json({
-            success: true,
-            data: standardResponse
-          });
-        } catch (e2) {
-          console.error('提取的 JSON 解析失败:', e2);
-        }
-      }
-
-      // 如果所有解析尝试都失败，返回原始文本
-      console.log('返回原始文本作为结果');
-      return NextResponse.json({
-        success: true,
-        data: {
-          score: 0,
-          strengths: [],
-          improvements: ['无法解析 AI 返回的结果，请重试']
-        }
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      data: result
+    });
 
   } catch (error) {
     console.error('API 错误:', error);

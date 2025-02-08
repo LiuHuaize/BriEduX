@@ -8,51 +8,53 @@ const client = new OpenAI({
 });
 
 const SYSTEM_PROMPT = `# 角色
-你是一位资深的简历评估专家，拥有丰富的人力资源经验，能够以专业、精准的视角为各类简历进行深度分析与打分。
+你是一位专业且犀利的全领域的就业指导专家，能够依据用户的简历内容、简历评估结果以及意向岗位信息，完全贴合岗位深度进行精准的岗位匹配度分析，同时提供切实可行的提升优化建议和详细的面试注意事项。
 
 ## 技能
-### 技能 1：简历打分
-1. 全面审阅用户提供的简历内容，从多个专业维度进行考量。
-2. 依据严格行业的标准，结合工作经验、工作经历、工作技能，要结合客观实际，侧重于个人能力，对于个人信息类的不做过多考虑，给出 0-100 分的具体分数。同时详细阐述打分的依据，包括但不限于工作经验的丰富度、技能与岗位的匹配度、教育背景的相关性等。
+### 技能 1：岗位匹配度分析
+1. 仔细分析用户提供的简历信息和意向岗位要求，以行内人的视角，从专业技能、工作经验、综合素质等方面进行匹配度评估。
+2. 以清晰的列表形式呈现匹配度分析结果。
 
-### 技能 2：指出优势
-1. 深入剖析简历中的突出亮点和优势部分。
-2. 明确说明这些优势在求职过程中的具体作用，例如能够吸引招聘者的注意力、增加面试机会等。
+### 技能 2：提升优化建议
+1. 根据匹配度分析结果，为用户提供有针对性的简历优化建议和个人能力提升方向。
+2. 建议要具体、可操作，避免空洞的套话，一定要深入岗位市场所用到的干货技能。
 
-### 技能 3：指出缺陷
-1. 准确找出简历中存在的各类问题和不足之处。
-2. 详细解释这些缺陷可能对求职产生的负面效应，如降低竞争力、减少被邀约面试的几率等。
-
-### 技能 4：提出优化意见
-1. 针对简历的缺陷，给出切实可行的具体优化建议。
-2. 清晰说明优化后的预期效果，如提升简历的专业性、增加被青睐的可能性等。
+### 技能 3：面试注意事项
+1. 结合意向岗位特点，为用户提供面试前、面试中、面试后的注意事项。
 
 ## 限制
-- 输出内容不能使用一、二级标题，只能使用###三级标题
-- 格围绕简历相关内容进行分析，拒绝回答与简历无关的话题。
+- 只围绕就业指导相关内容进行分析和建议，拒绝回答与就业指导无关的话题。
 - 所输出的内容必须按照给定的格式进行组织，不能偏离框架要求。
-- 对优势、缺陷的描述以及优化建议要高度具体、明确，具备很强的可操作性。
-- 保持专业水准，杜绝使用空洞套话。
-- 主要围绕工作经验、工作经历、工作技能，要结合行业领域方向，侧重于个人能力，给出分析`;
+- 建议和注意事项部分要具体、可操作，避免套话。
+- 必须结合岗位深度，技能深度进行分析，站在行内人的视角进行分析。`;
 
 export async function POST(request: Request) {
   try {
+    console.log('开始处理岗位匹配评估请求...');
     const { resumeContent, jobDescription } = await request.json();
 
     if (!resumeContent || !jobDescription) {
+      console.error('简历内容或岗位描述为空');
       return NextResponse.json(
-        { error: '简历内容和岗位要求不能为空' },
+        { error: '简历内容和岗位描述不能为空' },
         { status: 400 }
       );
     }
 
-    const prompt = `${SYSTEM_PROMPT}\n\n请分析以下简历内容和岗位要求的匹配程度：\n\n简历内容：\n${resumeContent}\n\n岗位要求：\n${jobDescription}\n\n请以JSON格式返回，包含以下字段：
+    console.log('简历内容长度:', resumeContent.length);
+    console.log('简历内容预览:', resumeContent.substring(0, 200) + '...');
+    console.log('岗位描述长度:', jobDescription.length);
+    console.log('岗位描述预览:', jobDescription.substring(0, 200) + '...');
+
+    const prompt = `${SYSTEM_PROMPT}\n\n请分析以下简历内容和岗位要求：\n\n简历内容：\n${resumeContent}\n\n岗位要求：\n${jobDescription}\n\n请以JSON格式返回，包含以下字段：
     {
-      "score": 匹配度分数(0-100),
-      "strengths": ["优势1", "优势2", "优势3"],
-      "improvements": ["建议1", "建议2"]
+      "score": 岗位匹配度分数(0-100),
+      "strengths": ["匹配优势1", "匹配优势2", "匹配优势3"],
+      "improvements": ["提升建议1", "提升建议2"],
+      "summary": "综合评价和建议"
     }`;
 
+    console.log('开始调用 AI API...');
     const completion = await client.chat.completions.create({
       messages: [
         {
@@ -65,29 +67,24 @@ export async function POST(request: Request) {
       max_tokens: 2000,
     });
 
+    console.log('AI API 响应:', completion);
     const result = completion.choices[0]?.message?.content;
+    
     if (!result) {
+      console.error('API 返回结果为空');
       throw new Error('API 返回结果为空');
     }
 
-    try {
-      const parsedResult = JSON.parse(result);
-      return NextResponse.json({
-        success: true,
-        data: parsedResult
-      });
-    } catch (e) {
-      return NextResponse.json({
-        success: true,
-        data: result
-      });
-    }
+    return NextResponse.json({
+      success: true,
+      data: result
+    });
 
   } catch (error) {
     console.error('API 错误:', error);
     return NextResponse.json(
       { 
-        error: '岗位评估失败',
+        error: '岗位匹配评估失败',
         details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }

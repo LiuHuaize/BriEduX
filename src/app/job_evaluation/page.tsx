@@ -11,13 +11,23 @@ interface EvaluationResult {
   score: number;
   strengths: string[];
   improvements: string[];
+  summary?: string;
+}
+
+interface CombinedEvaluationResult {
+  resumeEvaluation: EvaluationResult | null;
+  jobEvaluation: EvaluationResult | null;
 }
 
 const JobEvaluation = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [evaluationResults, setEvaluationResults] = useState<CombinedEvaluationResult>({
+    resumeEvaluation: null,
+    jobEvaluation: null
+  });
+  const [activeTab, setActiveTab] = useState<'resume' | 'job'>('resume');
   const [error, setError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -129,80 +139,85 @@ const JobEvaluation = () => {
       console.log('简历内容长度:', resumeContent.length);
       console.log('简历内容预览:', resumeContent.substring(0, 200) + '...');
 
-      // 调用评估 API
-      let evaluationResponse;
-      if (jobDescription) {
-        console.log('开始岗位匹配评估...');
-        console.log('岗位要求:', jobDescription);
-        evaluationResponse = await fetch('/api/job_evaluation', {
+      // 同时发起两个评估请求
+      const [resumeEvalResponse, jobEvalResponse] = await Promise.all([
+        // 简历评估
+        fetch('/api/resume_evaluation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resumeContent }),
+        }),
+        // 岗位匹配评估（如果有岗位描述）
+        jobDescription ? fetch('/api/job_evaluation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             resumeContent,
             jobDescription
           }),
-        });
-      } else {
-        console.log('开始简历评估...');
-        evaluationResponse = await fetch('/api/resume_evaluation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            resumeContent
-          }),
-        });
-      }
+        }) : Promise.resolve(null)
+      ]);
 
-      console.log('评估API响应状态:', evaluationResponse.status);
-      if (!evaluationResponse.ok) {
-        throw new Error(`评测请求失败: ${evaluationResponse.status}`);
-      }
-
-      const result = await evaluationResponse.json();
-      console.log('API 原始响应:', result);
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      // 从返回的文本中提取 JSON 字符串
-      let evaluationData: EvaluationResult;
-      try {
-        const jsonMatch = result.data.match(/```json\n([\s\S]*?)\n```/);
-        if (jsonMatch) {
+      // 处理简历评估结果
+      const resumeResult = await resumeEvalResponse.json();
+      let resumeEvaluation: EvaluationResult | null = null;
+      
+      if (resumeResult.data) {
+        try {
+          const jsonMatch = resumeResult.data.match(/```json\n([\s\S]*?)\n```/) || [null, resumeResult.data];
           const jsonStr = jsonMatch[1];
-          console.log('提取的 JSON 字符串:', jsonStr);
           const parsedData = JSON.parse(jsonStr);
-          console.log('解析后的 JSON 数据:', parsedData);
           
-          evaluationData = {
+          resumeEvaluation = {
             score: typeof parsedData.score === 'number' ? parsedData.score : 0,
             strengths: Array.isArray(parsedData.strengths) ? parsedData.strengths : [],
-            improvements: Array.isArray(parsedData.improvements) ? parsedData.improvements : []
+            improvements: Array.isArray(parsedData.improvements) ? parsedData.improvements : [],
+            summary: parsedData.summary || ''
           };
-        } else {
-          console.error('无法从响应中提取 JSON');
-          evaluationData = {
+        } catch (e) {
+          console.error('简历评估结果解析错误:', e);
+          resumeEvaluation = {
             score: 0,
             strengths: [],
-            improvements: ['无法解析评估结果，请重试']
+            improvements: ['简历评估结果解析失败'],
+            summary: ''
           };
         }
-      } catch (e) {
-        console.error('JSON 解析错误:', e);
-        evaluationData = {
-          score: 0,
-          strengths: [],
-          improvements: ['评估结果解析失败，请重试']
-        };
       }
 
-      console.log('处理后的评估数据:', evaluationData);
-      console.log('分数:', evaluationData.score);
-      console.log('优势数量:', evaluationData.strengths.length);
-      console.log('建议数量:', evaluationData.improvements.length);
+      // 处理岗位匹配评估结果
+      let jobEvaluation: EvaluationResult | null = null;
+      if (jobEvalResponse) {
+        const jobResult = await jobEvalResponse.json();
+        if (jobResult.data) {
+          try {
+            const jsonMatch = jobResult.data.match(/```json\n([\s\S]*?)\n```/) || [null, jobResult.data];
+            const jsonStr = jsonMatch[1];
+            const parsedData = JSON.parse(jsonStr);
+            
+            jobEvaluation = {
+              score: typeof parsedData.score === 'number' ? parsedData.score : 0,
+              strengths: Array.isArray(parsedData.strengths) ? parsedData.strengths : [],
+              improvements: Array.isArray(parsedData.improvements) ? parsedData.improvements : [],
+              summary: parsedData.summary || ''
+            };
+          } catch (e) {
+            console.error('岗位匹配评估结果解析错误:', e);
+            jobEvaluation = {
+              score: 0,
+              strengths: [],
+              improvements: ['岗位匹配评估结果解析失败'],
+              summary: ''
+            };
+          }
+        }
+      }
 
-      setEvaluationResult(evaluationData);
+      setEvaluationResults({
+        resumeEvaluation,
+        jobEvaluation
+      });
+      
       toast.success('评估完成！');
 
     } catch (err: any) {
@@ -404,89 +419,123 @@ const JobEvaluation = () => {
         </motion.div>
 
         {/* 评测结果展示区域 */}
-        {evaluationResult && (
+        {(evaluationResults.resumeEvaluation || evaluationResults.jobEvaluation) && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-8"
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-4xl mx-auto mt-8 px-4"
           >
-            {/* 开发环境下打印日志 */}
-            {process.env.NODE_ENV === 'development' && (() => {
-              console.log('渲染评估结果:', evaluationResult);
-              return null;
-            })()}
-            
-            {/* 分数展示 */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6 mb-6">
-              <div className="flex flex-col items-center">
-                <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
-                  {evaluationResult.score || 0}
-                  <span className="text-base text-gray-400 ml-1">分</span>
-                </div>
-                <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${evaluationResult.score || 0}%` }}
-                    transition={{ duration: 1, ease: "easeOut" }}
-                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
-                  />
-                </div>
+            {/* 切换按钮 */}
+            <div className="flex justify-center mb-6">
+              <div className="bg-white/80 backdrop-blur-sm rounded-full p-1 shadow-lg border border-gray-100/50">
+                <button
+                  onClick={() => setActiveTab('resume')}
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeTab === 'resume'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  简历评估
+                </button>
+                <button
+                  onClick={() => setActiveTab('job')}
+                  className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                    activeTab === 'job'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  disabled={!evaluationResults.jobEvaluation}
+                >
+                  岗位匹配
+                </button>
               </div>
             </div>
 
-            {/* 详细分析 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 优势展示 */}
-              {evaluationResult.strengths?.length > 0 ? (
+            {/* 评估结果内容 */}
+            <div className="space-y-6">
+              {/* 分数展示 */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-8">
+                <div className="flex flex-col items-center">
+                  <div className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800">
+                    {activeTab === 'resume' 
+                      ? evaluationResults.resumeEvaluation?.score || 0
+                      : evaluationResults.jobEvaluation?.score || 0}
+                    <span className="text-base text-gray-400 ml-1">分</span>
+                  </div>
+                  <div className="w-full max-w-xs h-1.5 bg-gray-100 rounded-full overflow-hidden mt-3">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ 
+                        width: `${activeTab === 'resume' 
+                          ? evaluationResults.resumeEvaluation?.score || 0
+                          : evaluationResults.jobEvaluation?.score || 0}%` 
+                      }}
+                      transition={{ duration: 1, ease: "easeOut" }}
+                      className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 优势和建议展示 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 优势展示 */}
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
                   <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100">
-                      <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    </div>
-                    优势亮点
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    优势分析
                   </h3>
                   <ul className="space-y-2">
-                    {evaluationResult.strengths.map((strength: string, index: number) => (
+                    {(activeTab === 'resume' 
+                      ? evaluationResults.resumeEvaluation?.strengths 
+                      : evaluationResults.jobEvaluation?.strengths)?.map((strength: string, index: number) => (
                       <li 
                         key={index}
-                        className="flex items-start gap-2 p-2.5 bg-green-50/50 rounded-xl"
+                        className="flex items-start gap-2 text-sm text-gray-600"
                       >
-                        <span className="w-1 h-1 mt-1.5 bg-green-500 rounded-full flex-shrink-0" />
-                        <span className="text-xs text-gray-600">{strength}</span>
+                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                        {strength}
                       </li>
                     ))}
                   </ul>
                 </div>
-              ) : (
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                  <p className="text-gray-500 text-sm">暂无优势分析</p>
-                </div>
-              )}
 
-              {/* 改进建议展示 */}
-              {evaluationResult.improvements?.length > 0 ? (
+                {/* 改进建议展示 */}
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
                   <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-orange-100">
-                      <AlertCircle className="w-3 h-3 text-orange-600" />
-                    </div>
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
                     改进建议
                   </h3>
                   <ul className="space-y-2">
-                    {evaluationResult.improvements.map((improvement: string, index: number) => (
+                    {(activeTab === 'resume'
+                      ? evaluationResults.resumeEvaluation?.improvements
+                      : evaluationResults.jobEvaluation?.improvements)?.map((improvement: string, index: number) => (
                       <li 
                         key={index}
-                        className="flex items-start gap-2 p-2.5 bg-orange-50/50 rounded-xl"
+                        className="flex items-start gap-2 text-sm text-gray-600"
                       >
-                        <span className="w-1 h-1 mt-1.5 bg-orange-500 rounded-full flex-shrink-0" />
-                        <span className="text-xs text-gray-600">{improvement}</span>
+                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                        {improvement}
                       </li>
                     ))}
                   </ul>
                 </div>
-              ) : (
+              </div>
+
+              {/* 综合评价 */}
+              {((activeTab === 'resume' ? evaluationResults.resumeEvaluation?.summary : evaluationResults.jobEvaluation?.summary) || '') && (
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100/50 p-6">
-                  <p className="text-gray-500 text-sm">暂无改进建议</p>
+                  <h3 className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-4">
+                    <LineChart className="w-5 h-5 text-blue-500" />
+                    综合评价
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {activeTab === 'resume' 
+                      ? evaluationResults.resumeEvaluation?.summary 
+                      : evaluationResults.jobEvaluation?.summary}
+                  </p>
                 </div>
               )}
             </div>
