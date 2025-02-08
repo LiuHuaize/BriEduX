@@ -492,31 +492,6 @@ const JobEvaluation = () => {
             </div>
           </motion.div>
         )}
-
-        {resumeFile && resumeFile.name.toLowerCase().endsWith('.pdf') && uploadStatus === 'success' && (
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleConvertPDF}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {conversionLoading ? "转换中..." : "转换PDF"}
-            </button>
-          </div>
-        )}
-
-        {conversionError && (
-          <div className="mt-4 p-4 bg-red-50 rounded-lg text-red-600">
-            {conversionError}
-          </div>
-        )}
-
-        {conversionResult && (
-          <div className="mt-4 p-4 bg-gray-100 rounded-lg">
-            <h3 className="text-lg font-medium text-gray-700">转换结果</h3>
-            <pre className="text-sm text-gray-800 whitespace-pre-wrap">{conversionResult}</pre>
-          </div>
-        )}
       </div>
     </div>
   );
