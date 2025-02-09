@@ -176,6 +176,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         data: jobListings.jobs,
+        output: parsedData.output,
         debug_url: cozeData.debug_url
       });
     } catch (parseError) {

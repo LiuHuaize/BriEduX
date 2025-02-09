@@ -284,7 +284,6 @@ export default function JobsPage() {
     setSearchError(null);
     setSearchResults([]);
     setSearchMessage("");
-    setLoadingDescriptions({});
 
     try {
       const response = await fetch('/api/jobs/search', {
@@ -295,26 +294,26 @@ export default function JobsPage() {
         body: JSON.stringify({ query: finalQuery }),
       });
 
-      const data: SearchResponse = await response.json();
+      const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.message || '搜索失败');
       }
 
-      if (data.success) {
-        // 设置基本搜索结果
-        setSearchResults(data.data || []);
-        if (data.output) {
-          setSearchMessage(data.output);
-        }
+      // 设置搜索结果
+      setSearchResults(data.data || []);
+      
+      // 设置 AI 建议消息
+      if (data.output) {
+        setSearchMessage(data.output);
+      }
 
-        // 自动开始加载所有岗位描述
-        data.data.forEach(job => {
+      // 加载职位描述
+      if (data.data && data.data.length > 0) {
+        data.data.forEach((job: JobInfo) => {
           setLoadingDescriptions(prev => ({ ...prev, [job.url]: true }));
           handleLoadDescription(job);
         });
-      } else {
-        throw new Error('返回数据格式不正确');
       }
     } catch (error) {
       setSearchError(error instanceof Error ? error.message : '搜索过程中发生错误');
@@ -750,43 +749,50 @@ export default function JobsPage() {
                 <Alert className="mt-6 bg-blue-50 border-blue-200">
                   <Info className="h-4 w-4 text-blue-500" />
                   <AlertTitle className="text-blue-700">AI 智能建议</AlertTitle>
-                  <AlertDescription className="text-blue-600 mt-2">
+                  <AlertDescription className="text-blue-600 mt-2 whitespace-pre-line">
                     {searchMessage}
                   </AlertDescription>
                   <div className="mt-4 flex flex-wrap gap-2">
+                    {filters.minSalary && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        onClick={() => {
+                          setFilters(prev => ({
+                            ...prev,
+                            minSalary: undefined
+                          }));
+                          handleSearch();
+                        }}
+                      >
+                        清除薪资筛选
+                      </Button>
+                    )}
+                    {filters.location && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        onClick={() => {
+                          setFilters(prev => ({
+                            ...prev,
+                            location: ""
+                          }));
+                          handleSearch();
+                        }}
+                      >
+                        清除地点筛选
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
                       className="text-blue-600 border-blue-200 hover:bg-blue-50"
                       onClick={() => {
-                        // 清除薪资筛选
-                        setFilters(prev => ({
-                          ...prev,
-                          minSalary: undefined
-                        }));
+                        handleResetFilters();
+                        handleSearch();
                       }}
-                    >
-                      清除薪资筛选
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                      onClick={() => {
-                        // 清除地点筛选
-                        setFilters(prev => ({
-                          ...prev,
-                          location: ""
-                        }));
-                      }}
-                    >
-                      清除地点筛选
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                      onClick={handleResetFilters}
                     >
                       重置所有筛选
                     </Button>
