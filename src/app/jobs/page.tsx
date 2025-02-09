@@ -374,7 +374,7 @@ export default function JobsPage() {
       <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-blue-50 to-transparent -z-10" />
       
       {/* 主要内容区域 */}
-      <div className="relative max-w-6xl mx-auto px-4 py-16 sm:px-6 lg:px-8">
+      <div className="relative max-w-6xl mx-auto px-4 pt-24 pb-16 sm:px-6 lg:px-8">
         {/* 标题区域 */}
         <div className="text-center mb-16">
           <motion.h1 

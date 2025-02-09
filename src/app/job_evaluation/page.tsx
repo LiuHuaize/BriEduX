@@ -386,7 +386,7 @@ const JobEvaluation = () => {
           className="text-center mb-12"
         >
           <div className="inline-block">
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-800 mb-3">
+            <h1 className="text-4xl font-bold text-gray-900 mb-3">
               AI 简历评测
             </h1>
             <div className="h-1 w-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mx-auto" />

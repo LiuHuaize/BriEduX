@@ -76,7 +76,7 @@ export default function ResumePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white pb-20">
       {/* Header Section */}
-      <div className="relative overflow-hidden pt-16 pb-32">
+      <div className="relative overflow-hidden pt-24 pb-32">
         <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] bg-top" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
