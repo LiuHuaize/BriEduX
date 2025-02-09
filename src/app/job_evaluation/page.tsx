@@ -386,12 +386,12 @@ const JobEvaluation = () => {
           className="text-center mb-12"
         >
           <div className="inline-block">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-5xl font-bold text-gray-900 mb-4">
               AI 简历评测
             </h1>
-            <div className="h-1 w-16 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mx-auto" />
+            <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mx-auto" />
           </div>
-          <p className="text-gray-500 mt-4 text-base">
+          <p className="text-gray-500 mt-6 text-lg">
             智能分析您的简历与目标职位的匹配程度
           </p>
         </motion.div>
