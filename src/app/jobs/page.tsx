@@ -544,7 +544,7 @@ export default function JobsPage() {
                       placeholder="例如：我想要在重庆找一份律师的工作，我是本科然后想要一份6000以上的工作"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full h-32 px-4 py-3 text-base resize-none rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                      className="w-full h-32 px-4 py-3 text-base text-gray-900 resize-none rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                     />
                   </div>
                   <div className="flex items-center justify-between">
