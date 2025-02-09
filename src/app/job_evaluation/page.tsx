@@ -37,6 +37,88 @@ const JobEvaluation = () => {
   const [conversionLoading, setConversionLoading] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
 
+  const handleConvertPDF = async () => {
+    if (!filePath) {
+      toast.error('无效的文件路径');
+      return;
+    }
+    setConversionLoading(true);
+    setConversionResult(null);
+    setConversionError(null);
+    try {
+      const response = await fetch('/api/convert_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath }),
+      });
+      const data = await response.json();
+      if (data.error) {
+        setConversionError(data.error);
+      } else {
+        setConversionResult(data.markdown);
+      }
+    } catch (error: any) {
+      setConversionError(error.message || '转换出错');
+    } finally {
+      setConversionLoading(false);
+    }
+  };
+
+  // 新增：处理文本文件
+  const handleTextFile = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve(e.target?.result as string);
+      };
+      reader.onerror = (e) => {
+        reject(new Error('文本文件读取失败'));
+      };
+      reader.readAsText(file);
+    });
+  };
+
+  // 新增：处理Word文件
+  const handleWordFile = async (file: File): Promise<string> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/convert_word', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Word文件处理失败');
+      }
+      
+      const data = await response.json();
+      if (!data.text || typeof data.text !== 'string') {
+        throw new Error('Word文件内容转换失败');
+      }
+
+      // 格式化Word文档内容
+      const formattedText = data.text
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\t/g, '    ')  // 将制表符转换为空格
+        .replace(/\u00A0/g, ' ')  // 替换特殊空格字符
+        .replace(/\s{3,}/g, '  ')  // 将多个空格替换为两个空格
+        .trim();
+
+      if (!formattedText) {
+        throw new Error('Word文件内容为空');
+      }
+
+      return formattedText;
+    } catch (error: any) {
+      console.error('Word处理错误:', error);
+      throw new Error(`Word文件处理失败: ${error.message}`);
+    }
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -50,50 +132,105 @@ const JobEvaluation = () => {
         setResumeFile(file);
         setUploadStatus('uploading');
         setUploadProgress(20);
+        setError(null); // 清除之前的错误
 
-        // 生成唯一的文件名
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${uuidv4()}.${fileExt}`;
-        const filePath = `resume/${fileName}`;
+        let resumeContent = '';
 
-        // 创建 FormData 对象
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('filePath', filePath);
+        // 根据文件类型选择不同的处理方式
+        if (file.type === 'text/plain') {
+          // 处理TXT文件
+          resumeContent = await handleTextFile(file);
+        } else if (file.type === 'application/msword' || file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          // 处理Word文件
+          setUploadProgress(40);
+          resumeContent = await handleWordFile(file);
+          setUploadProgress(80);
+        } else {
+          // PDF文件处理
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${uuidv4()}.${fileExt}`;
+          const filePath = `resume/${fileName}`;
 
-        setUploadProgress(40);
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('filePath', filePath);
 
-        // 调用上传 API
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
+          setUploadProgress(40);
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || '文件上传失败');
+          // 调用上传 API
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || '文件上传失败');
+          }
+
+          setUploadProgress(60);
+
+          const result = await response.json();
+          if (result.error) {
+            throw new Error(result.error);
+          }
+
+          // 保存文件的公共URL和存储路径
+          setFileUrl(result.data.publicUrl);
+          setFilePath(filePath);
+          
+          // 转换PDF文件
+          setUploadProgress(80);
+          const pdfResponse = await fetch('/api/convert_pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filePath }),
+          });
+          
+          if (!pdfResponse.ok) {
+            const error = await pdfResponse.json();
+            throw new Error(error.message || 'PDF转换失败');
+          }
+
+          const pdfData = await pdfResponse.json();
+          if (pdfData.error) {
+            throw new Error(pdfData.error);
+          }
+          
+          resumeContent = pdfData.markdown;
         }
 
-        setUploadProgress(80);
-
-        const result = await response.json();
-        if (result.error) {
-          throw new Error(result.error);
+        // 验证和格式化最终内容
+        if (!resumeContent || typeof resumeContent !== 'string') {
+          throw new Error('文件内容获取失败');
         }
 
-        // 保存文件的公共URL和存储路径
-        setFileUrl(result.data.publicUrl);
-        setFilePath(filePath);
-        
+        // 格式化内容
+        const formattedContent = resumeContent
+          .replace(/\r\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .replace(/\t/g, '    ')
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s{3,}/g, '  ')
+          .trim();
+
+        if (!formattedContent) {
+          throw new Error('文件内容为空');
+        }
+
+        setConversionResult(formattedContent);
         setUploadProgress(100);
         setUploadStatus('success');
-        toast.success('文件上传成功！');
+        toast.success(`${file.type === 'text/plain' ? '文本' : file.type.includes('word') ? 'Word' : 'PDF'}文件处理成功！`);
 
       } catch (err: any) {
         console.error('Upload error:', err);
         setUploadStatus('error');
         setError(err.message || '文件上传失败');
-        toast.error('文件上传失败，请重试');
+        toast.error(err.message || '文件上传失败，请重试');
+        setConversionResult(null);
+      } finally {
+        setUploadProgress(100);
       }
     }
   };
@@ -105,39 +242,22 @@ const JobEvaluation = () => {
     console.log('开始提交评估请求...');
 
     try {
-      if (!resumeFile || !fileUrl) {
+      if (!resumeFile) {
         throw new Error('请先上传简历文件');
       }
-      console.log('文件信息:', { 
-        fileName: resumeFile.name,
-        fileUrl,
-        filePath,
-        hasConversionResult: !!conversionResult 
-      });
 
-      // 首先获取简历内容
-      let resumeContent = '';
-      if (conversionResult) {
-        console.log('使用已有的转换结果');
-        resumeContent = conversionResult;
-      } else {
-        console.log('开始转换PDF文件...');
-        const response = await fetch('/api/convert_pdf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filePath }),
-        });
-        const data = await response.json();
-        console.log('PDF转换结果:', data);
-        
-        if (data.error) {
-          throw new Error(data.error);
-        }
-        resumeContent = data.markdown;
-        setConversionResult(data.markdown);
+      if (!conversionResult) {
+        throw new Error('简历内容获取失败');
       }
-      console.log('简历内容长度:', resumeContent.length);
-      console.log('简历内容预览:', resumeContent.substring(0, 200) + '...');
+
+      // 格式化简历内容，确保文本格式正确
+      const formattedContent = conversionResult
+        .replace(/\r\n/g, '\n')  // 统一换行符
+        .replace(/\n{3,}/g, '\n\n')  // 将多个连续空行减少为最多两个
+        .trim();  // 去除首尾空白
+
+      console.log('简历内容长度:', formattedContent.length);
+      console.log('简历内容预览:', formattedContent.substring(0, 200) + '...');
 
       // 同时发起两个评估请求
       const [resumeEvalResponse, jobEvalResponse] = await Promise.all([
@@ -145,18 +265,31 @@ const JobEvaluation = () => {
         fetch('/api/resume_evaluation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ resumeContent }),
+          body: JSON.stringify({ 
+            resumeContent: formattedContent 
+          }),
         }),
         // 岗位匹配评估（如果有岗位描述）
         jobDescription ? fetch('/api/job_evaluation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            resumeContent,
-            jobDescription
+            resumeContent: formattedContent,
+            jobDescription: jobDescription.trim()
           }),
         }) : Promise.resolve(null)
       ]);
+
+      // 检查响应状态
+      if (!resumeEvalResponse.ok) {
+        const errorData = await resumeEvalResponse.json();
+        throw new Error(errorData.error || '简历评估请求失败');
+      }
+
+      if (jobEvalResponse && !jobEvalResponse.ok) {
+        const errorData = await jobEvalResponse.json();
+        throw new Error(errorData.error || '岗位匹配评估请求失败');
+      }
 
       // 处理简历评估结果
       const resumeResult = await resumeEvalResponse.json();
@@ -234,33 +367,6 @@ const JobEvaluation = () => {
     } finally {
       setIsLoading(false);
       console.log('评估流程结束');
-    }
-  };
-
-  const handleConvertPDF = async () => {
-    if (!filePath) {
-      toast.error('无效的文件路径');
-      return;
-    }
-    setConversionLoading(true);
-    setConversionResult(null);
-    setConversionError(null);
-    try {
-      const response = await fetch('/api/convert_pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filePath }),
-      });
-      const data = await response.json();
-      if (data.error) {
-        setConversionError(data.error);
-      } else {
-        setConversionResult(data.markdown);
-      }
-    } catch (error: any) {
-      setConversionError(error.message || '转换出错');
-    } finally {
-      setConversionLoading(false);
     }
   };
 

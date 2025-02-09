@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   "score": 分数(0-100),
   "strengths": ["优势1", "优势2", "优势3"],
   "improvements": ["建议1", "建议2"],
-  "summary": "综合评价和建议（约400字）"
+  "summary": "综合评价和建议（约500字）"
 }
 
 注意：

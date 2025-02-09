@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   "score": 岗位匹配度分数(0-100),
   "strengths": ["匹配优势1", "匹配优势2", "匹配优势3"],
   "improvements": ["提升建议1", "提升建议2"],
-  "summary": "综合评价和建议（约400字）"
+  "summary": "综合评价和建议（约500字）"
 }
 
 注意：
