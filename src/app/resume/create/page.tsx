@@ -287,7 +287,7 @@ const CreateResume = () => {
   };
 
   const { messages: apiMessages, input, handleInputChange, handleSubmit: handleChatSubmit, isLoading } = useChat({
-    api: '/api/deepseek/r1-single',
+    api: '/api/deepseek/r1-2.4',
     initialMessages: [
       {
         id: 'system',

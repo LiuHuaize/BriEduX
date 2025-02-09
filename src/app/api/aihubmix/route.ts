@@ -43,9 +43,9 @@ export async function POST(req: Request) {
           content: prompt,
         }
       ],
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-pro-exp-02-05-search",
       temperature: 0.7,
-      max_tokens: 1000,
+     
     });
 
     // 解析返回的结果

@@ -62,9 +62,9 @@ export async function POST(request: Request) {
           content: prompt,
         }
       ],
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-pro-exp-02-05-search",
       temperature: 0.7,
-      max_tokens: 2000,
+      
     });
 
     console.log('AI API 响应:', completion);

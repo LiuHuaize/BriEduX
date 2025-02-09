@@ -12,6 +12,7 @@
     "@ai-sdk/anthropic": "^1.1.2",
     "@ai-sdk/openai": "^1.1.2",
     "@deepgram/sdk": "^3.6.0",
+    "@google/generative-ai": "^0.21.0",
     "@radix-ui/react-alert-dialog": "^1.1.5",
     "@radix-ui/react-dialog": "^1.1.5",
     "@radix-ui/react-label": "^2.1.1",
