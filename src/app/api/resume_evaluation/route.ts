@@ -7,33 +7,19 @@ const client = new OpenAI({
   baseURL: 'https://aihubmix.com/v1'
 });
 
-const SYSTEM_PROMPT = `# 角色
-你是一位资深的简历评估专家，拥有丰富的人力资源经验，能够以专业、精准的视角为各类简历进行深度分析与打分。
+const SYSTEM_PROMPT = `你是一位资深的简历评估专家，拥有丰富的人力资源经验，能够以专业、精准的视角为各类简历进行深度分析与打分。
 
-## 技能
-### 技能 1：简历打分
-1. 全面审阅用户提供的简历内容，从多个专业维度进行考量。
-2. 依据严格行业的标准，结合工作经验、工作经历、工作技能，要结合客观实际，侧重于个人能力，对于个人信息类的不做过多考虑，给出 0-100 分的具体分数。同时详细阐述打分的依据，包括但不限于工作经验的丰富度、技能与岗位的匹配度、教育背景的相关性等。
+评估要求：
+1. 全面审阅简历内容，从工作经验、工作经历、工作技能等多个维度进行评估
+2. 依据行业标准，给出0-100分的具体分数，并详细说明打分依据
+3. 深入分析简历中的突出优势，说明这些优势在求职过程中的具体作用
+4. 找出简历中存在的问题和不足，并给出切实可行的优化建议
 
-### 技能 2：指出优势
-1. 深入剖析简历中的突出亮点和优势部分。
-2. 明确说明这些优势在求职过程中的具体作用，例如能够吸引招聘者的注意力、增加面试机会等。
-
-### 技能 3：指出缺陷
-1. 准确找出简历中存在的各类问题和不足之处。
-2. 详细解释这些缺陷可能对求职产生的负面效应，如降低竞争力、减少被邀约面试的几率等。
-
-### 技能 4：提出优化意见
-1. 针对简历的缺陷，给出切实可行的具体优化建议。
-2. 清晰说明优化后的预期效果，如提升简历的专业性、增加被青睐的可能性等。
-
-## 限制
-- 输出内容不能使用一、二级标题，只能使用###三级标题
-- 格围绕简历相关内容进行分析，拒绝回答与简历无关的话题。
-- 所输出的内容必须按照给定的格式进行组织，不能偏离框架要求。
-- 对优势、缺陷的描述以及优化建议要高度具体、明确，具备很强的可操作性。
-- 保持专业水准，杜绝使用空洞套话。
-- 主要围绕工作经验、工作经历、工作技能，要结合行业领域方向，侧重于个人能力，给出分析`;
+注意事项：
+- 输出内容使用纯文本格式，不要使用markdown语法
+- 评估要围绕工作经验、工作经历、工作技能进行分析
+- 所有建议要高度具体、明确，具备很强的可操作性
+- 保持专业水准，杜绝使用空洞套话`;
 
 export async function POST(request: Request) {
   try {
@@ -51,25 +37,34 @@ export async function POST(request: Request) {
     console.log('简历内容长度:', resumeContent.length);
     console.log('简历内容预览:', resumeContent.substring(0, 200) + '...');
 
-    const prompt = `${SYSTEM_PROMPT}\n\n请分析以下简历内容：\n\n${resumeContent}\n\n请以JSON格式返回，包含以下字段：
-    {
-      "score": 分数(0-100),
-      "strengths": ["优势1", "优势2", "优势3"],
-      "improvements": ["建议1", "建议2"],
-      "summary": "综合评价和建议，需要一个具体的包括改进方案和一些推荐的建议，大概400字左右，纯文本格式，注意分行，不要markdown格式，不要包含*这种"
-    }`;
+    const prompt = `${SYSTEM_PROMPT}\n\n请分析以下简历内容：\n\n${resumeContent}\n\n请严格按照以下JSON格式返回，不要包含任何其他内容：
+{
+  "score": 分数(0-100),
+  "strengths": ["优势1", "优势2", "优势3"],
+  "improvements": ["建议1", "建议2"],
+  "summary": "综合评价和建议（约400字）"
+}
+
+注意：
+1. 必须严格按照JSON格式返回
+2. 不要添加任何额外的开场白或说明
+3. 不要使用markdown格式
+4. 确保所有字段都是合法的JSON值`;
 
     console.log('开始调用 AI API...');
     const completion = await client.chat.completions.create({
       messages: [
         {
+          role: "system",
+          content: "你是一个JSON格式化助手，你的回答必须是严格的JSON格式，不能包含任何其他内容。",
+        },
+        {
           role: "user",
           content: prompt,
         }
       ],
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-pro-exp-02-05",
       temperature: 0.7,
-      max_tokens: 3000,
     });
 
     console.log('AI API 响应:', completion);
@@ -80,10 +75,48 @@ export async function POST(request: Request) {
       throw new Error('API 返回结果为空');
     }
 
-    return NextResponse.json({
-      success: true,
-      data: result
-    });
+    // 清理和解析JSON字符串
+    try {
+      let cleanResult = result.trim();
+      
+      // 尝试提取JSON部分
+      const jsonMatch = cleanResult.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanResult = jsonMatch[0];
+      }
+
+      // 移除可能的注释和非JSON内容
+      cleanResult = cleanResult.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+      
+      // 尝试解析JSON
+      const parsedResult = JSON.parse(cleanResult);
+      
+      // 确保所有必需的字段都存在
+      if (!parsedResult.score || !parsedResult.strengths || !parsedResult.improvements || !parsedResult.summary) {
+        throw new Error('返回的JSON缺少必需字段');
+      }
+
+      // 处理summary字段，确保是纯文本
+      parsedResult.summary = parsedResult.summary
+        .replace(/\*\*/g, '')
+        .replace(/#{1,6}\s/g, '')
+        .replace(/\\n/g, '\n')
+        .trim();
+
+      return NextResponse.json({
+        success: true,
+        data: parsedResult
+      });
+    } catch (parseError) {
+      console.error('JSON解析错误:', parseError);
+      // 如果解析失败，返回格式化的错误信息
+      return NextResponse.json({
+        success: false,
+        error: 'JSON解析错误',
+        details: parseError instanceof Error ? parseError.message : String(parseError),
+        rawContent: result
+      }, { status: 400 });
+    }
 
   } catch (error) {
     console.error('API 错误:', error);

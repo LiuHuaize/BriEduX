@@ -164,9 +164,10 @@ const JobEvaluation = () => {
       
       if (resumeResult.data) {
         try {
-          const jsonMatch = resumeResult.data.match(/```json\n([\s\S]*?)\n```/) || [null, resumeResult.data];
-          const jsonStr = jsonMatch[1];
-          const parsedData = JSON.parse(jsonStr);
+          // 如果data已经是解析好的JSON对象
+          const parsedData = typeof resumeResult.data === 'string' 
+            ? JSON.parse(resumeResult.data) 
+            : resumeResult.data;
           
           resumeEvaluation = {
             score: typeof parsedData.score === 'number' ? parsedData.score : 0,
@@ -180,7 +181,7 @@ const JobEvaluation = () => {
             score: 0,
             strengths: [],
             improvements: ['简历评估结果解析失败'],
-            summary: ''
+            summary: resumeResult.data || ''
           };
         }
       }
@@ -191,9 +192,10 @@ const JobEvaluation = () => {
         const jobResult = await jobEvalResponse.json();
         if (jobResult.data) {
           try {
-            const jsonMatch = jobResult.data.match(/```json\n([\s\S]*?)\n```/) || [null, jobResult.data];
-            const jsonStr = jsonMatch[1];
-            const parsedData = JSON.parse(jsonStr);
+            // 如果data已经是解析好的JSON对象
+            const parsedData = typeof jobResult.data === 'string' 
+              ? JSON.parse(jobResult.data) 
+              : jobResult.data;
             
             jobEvaluation = {
               score: typeof parsedData.score === 'number' ? parsedData.score : 0,
@@ -207,7 +209,7 @@ const JobEvaluation = () => {
               score: 0,
               strengths: [],
               improvements: ['岗位匹配评估结果解析失败'],
-              summary: ''
+              summary: jobResult.data || ''
             };
           }
         }
