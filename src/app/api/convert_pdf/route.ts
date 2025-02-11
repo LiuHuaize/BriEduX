@@ -3,12 +3,14 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import pdf from 'pdf-parse';
 
 // 创建 Supabase 客户端
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+const COZE_API_KEY = process.env.COZE_API_KEY!;
+const COZE_WORKFLOW_ID = '7470141462618570804';
 
 export async function POST(request: Request) {
   try {
@@ -19,51 +21,47 @@ export async function POST(request: Request) {
 
     console.log('开始处理文件:', filePath);
 
-    // 从 Supabase Storage 下载文件
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from('resume')
-      .download(filePath);
+    // 构建完整的文件URL
+    const fileUrl = `${supabaseUrl}/storage/v1/object/public/resume/${filePath}`;
+    console.log('文件URL:', fileUrl);
 
-    if (downloadError) {
-      console.error('Supabase 下载错误:', downloadError);
+    // 调用Coze API
+    const cozeResponse = await fetch('https://api.coze.cn/v1/workflow/run', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${COZE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        parameters: {
+          input: fileUrl
+        },
+        workflow_id: COZE_WORKFLOW_ID
+      })
+    });
+
+    if (!cozeResponse.ok) {
+      const errorData = await cozeResponse.text();
+      console.error('Coze API错误:', errorData);
       return NextResponse.json({ 
-        error: '文件下载失败',
-        details: downloadError.message 
+        error: 'PDF转换失败',
+        details: errorData 
       }, { status: 500 });
     }
 
-    if (!fileData) {
-      console.error('没有接收到文件数据');
+    const cozeData = await cozeResponse.json();
+    
+    if (cozeData.code !== 0) {
       return NextResponse.json({ 
-        error: '文件下载失败: 没有接收到数据'
+        error: '转换失败',
+        details: cozeData.msg 
       }, { status: 500 });
     }
 
-    try {
-      // 将文件数据转换为 Buffer
-      const buffer = Buffer.from(await fileData.arrayBuffer());
-      
-      // 使用 pdf-parse 解析 PDF
-      const data = await pdf(buffer);
-      
-      // 提取文本内容并进行基本格式化
-      const text = data.text
-        .replace(/\n{3,}/g, '\n\n') // 替换多个换行为两个换行
-        .replace(/\s{2,}/g, ' ') // 替换多个空格为一个空格
-        .trim();
-
-      // 将文本转换为 Markdown 格式
-      const markdown = `# 简历内容\n\n${text}`;
-
-      console.log('转换成功');
-      return NextResponse.json({ markdown });
-    } catch (parseError) {
-      console.error('PDF 解析错误:', parseError);
-      return NextResponse.json({ 
-        error: 'PDF 解析失败',
-        details: parseError instanceof Error ? parseError.message : String(parseError)
-      }, { status: 500 });
-    }
+    // 解析返回的数据
+    const outputData = JSON.parse(cozeData.data);
+    
+    return NextResponse.json({ markdown: outputData.output });
   } catch (error) {
     console.error('API错误:', error);
     return NextResponse.json({ 
