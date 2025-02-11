@@ -75,6 +75,20 @@ interface JobInfo {
   description?: string;
 }
 
+interface SearchResponse {
+  success: boolean;
+  data: JobInfo[];
+  message?: string;
+  output?: string;
+}
+
+interface KeywordSearchResult {
+  keyword: string;
+  jobs: JobInfo[];
+  isLoading: boolean;
+  error?: string;
+}
+
 // Supabase 客户端配置 - 使用 anon key 用于基本操作
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -104,13 +118,6 @@ const experienceMap: { [key: string]: string } = {
   "10+": "10年以上经验"
 };
 
-interface SearchResponse {
-  success: boolean;
-  data: JobInfo[];
-  message?: string;
-  output?: string;
-}
-
 export default function JobsPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -133,14 +140,20 @@ export default function JobsPage() {
   const [uploadLogs, setUploadLogs] = useState<Array<{
     time: Date;
     message: string;
-    type: 'info' | 'success' | 'error';
+    type: 'info' | 'success' | 'error' | 'warning';
   }>>([]);
   const [searchMessage, setSearchMessage] = useState<string>("");
   const [loadingDescriptions, setLoadingDescriptions] = useState<{ [key: string]: boolean }>({});
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [conversionResult, setConversionResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [keywordResults, setKeywordResults] = useState<KeywordSearchResult[]>([]);
+  const [isGeneratingKeywords, setIsGeneratingKeywords] = useState(false);
+  const [generatedKeywords, setGeneratedKeywords] = useState<string[]>([]);
+  const [keywordError, setKeywordError] = useState<string | null>(null);
 
   // 添加日志
-  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+  const addLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     setUploadLogs(prev => [...prev, {
       time: new Date(),
       message,
@@ -161,15 +174,23 @@ export default function JobsPage() {
     accept: {
       'application/pdf': ['.pdf'],
       'application/msword': ['.doc'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt']
     },
     multiple: false
   });
 
   const handleFileUpload = async (file: File) => {
-    const validTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('请上传 PDF 或 Word 格式的简历');
+    const validTypes = {
+      'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'text/plain': 'txt'
+    };
+    
+    const fileType = validTypes[file.type as keyof typeof validTypes];
+    if (!fileType) {
+      toast.error('请上传 PDF、Word 或 TXT 格式的简历');
       return;
     }
 
@@ -184,60 +205,134 @@ export default function JobsPage() {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `resume/${fileName}`;
 
-      // 创建 FormData 对象
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('filePath', filePath);
+      // 开始处理进度提示
+      addLog('开始处理简历文件...', 'info');
+      setUploadProgress(20);
 
-      // 模拟分析进度
-      const progressSteps = [
-        { progress: 20, message: '正在解析简历...' },
-        { progress: 40, message: '提取关键技能...' },
-        { progress: 60, message: '分析工作经验...' },
-        { progress: 80, message: '匹配合适职位...' },
-        { progress: 90, message: '生成推荐报告...' }
-      ];
+      let extractedText = '';
+      
+      // 根据文件类型调用不同的处理API
+      if (fileType === 'pdf') {
+        // 首先通过API上传文件
+        console.log('正在上传PDF文件...');
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('filePath', filePath);
+        
+        // 上传文件
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
 
-      let currentStep = 0;
-      const progressInterval = setInterval(() => {
-        if (currentStep < progressSteps.length) {
-          setUploadProgress(progressSteps[currentStep].progress);
-          addLog(progressSteps[currentStep].message, 'info');
-          currentStep++;
-        } else {
-          clearInterval(progressInterval);
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || '文件上传失败');
         }
-      }, 1000);
 
-      // 上传文件
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
+        setUploadProgress(40);
+        console.log('PDF文件上传成功，开始转换...');
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || '上传失败');
+        // 处理PDF文件
+        const response = await fetch('/api/convert_pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ filePath }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'PDF处理失败');
+        }
+        
+        const result = await response.json();
+        extractedText = result.markdown;
+        
+      } else if (fileType === 'doc' || fileType === 'docx') {
+        // 处理Word文件
+        console.log('开始处理Word文件...');
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const response = await fetch('/api/convert_word', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Word文件处理失败');
+        }
+        
+        const result = await response.json();
+        extractedText = result.text;
+
+        // Word文件处理成功后，上传到存储
+        console.log('Word文件处理成功，开始上传...');
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+        uploadFormData.append('filePath', filePath);
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          console.warn('文件存储失败，但内容已提取');
+          addLog('文件存储失败，但内容已提取', 'warning');
+        }
+        
+      } else if (fileType === 'txt') {
+        // 直接读取txt文件内容
+        console.log('开始读取文本文件...');
+        extractedText = await file.text();
+
+        // 文本文件处理成功后，上传到存储
+        console.log('文本文件读取成功，开始上传...');
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file);
+        uploadFormData.append('filePath', filePath);
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData,
+        });
+
+        if (!uploadResponse.ok) {
+          console.warn('文件存储失败，但内容已提取');
+          addLog('文件存储失败，但内容已提取', 'warning');
+        }
       }
 
-      const data = await response.json();
+      setUploadProgress(80);
+      addLog('简历内容提取完成', 'success');
+
       setUploadProgress(100);
       setUploadStatus('success');
-      
-      toast.success('简历分析完成！');
-      addLog('🎉 已为您匹配最适合的职位', 'success');
-      
-      // 获取文件URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('resume')
-        .getPublicUrl(filePath);
+      addLog('🎉 简历处理完成！', 'success');
 
-    } catch (error) {
+      // 保存提取的文本内容
+      setConversionResult(extractedText);
+
+      // 添加自动搜索调用
+      if (extractedText) {
+        handleAutoSearch(extractedText);
+      }
+
+      toast.success(`${file.type === 'text/plain' ? '文本' : file.type.includes('word') ? 'Word' : 'PDF'}文件处理成功！`);
+
+    } catch (error: any) {
       console.error('Upload error:', error);
       setUploadStatus('error');
-      toast.error('简历处理失败，请重试');
+      setError(error.message || '文件处理失败');
+      toast.error(error.message || '文件处理失败，请重试');
+      setConversionResult(null);
     } finally {
       setIsUploading(false);
+      setUploadProgress(100);
     }
   };
 
@@ -355,6 +450,7 @@ export default function JobsPage() {
         if (descResponse.ok) {
           const descData = await descResponse.json();
           if (descData.success && descData.data.description) {
+            // 更新搜索结果中的职位描述
             setSearchResults(prev => 
               prev.map(j => 
                 j.url === job.url 
@@ -362,10 +458,21 @@ export default function JobsPage() {
                   : j
               )
             );
-            break; // 成功获取描述，跳出重试循环
+
+            // 同时更新关键词搜索结果中的职位描述
+            setKeywordResults(prev => 
+              prev.map(result => ({
+                ...result,
+                jobs: result.jobs.map(j =>
+                  j.url === job.url
+                    ? { ...j, description: descData.data.description }
+                    : j
+                )
+              }))
+            );
+            break;
           }
         } else if (descResponse.status === 504) {
-          // 如果是超时错误，等待后重试
           await new Promise(resolve => setTimeout(resolve, 2000));
           retries--;
           continue;
@@ -376,22 +483,108 @@ export default function JobsPage() {
         console.error('获取岗位描述失败:', error);
         retries--;
         if (retries === 0) {
-          // 所有重试都失败了，显示错误信息
+          const errorMessage = '获取岗位描述失败，请稍后重试';
+          // 更新搜索结果中的错误信息
           setSearchResults(prev => 
             prev.map(j => 
               j.url === job.url 
-                ? { ...j, description: '获取岗位描述失败，请稍后重试' }
+                ? { ...j, description: errorMessage }
                 : j
             )
           );
+          // 更新关键词搜索结果中的错误信息
+          setKeywordResults(prev => 
+            prev.map(result => ({
+              ...result,
+              jobs: result.jobs.map(j =>
+                j.url === job.url
+                  ? { ...j, description: errorMessage }
+                  : j
+              )
+            }))
+          );
         } else {
-          // 等待一段时间后重试
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
     }
     
     setLoadingDescriptions(prev => ({ ...prev, [job.url]: false }));
+  };
+
+  const handleKeywordSearch = async (keyword: string) => {
+    setKeywordResults((prev: KeywordSearchResult[]) => [
+      ...prev,
+      { keyword, jobs: [], isLoading: true }
+    ]);
+
+    try {
+      const response = await fetch('/api/jobs/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: keyword })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || '搜索失败');
+
+      setKeywordResults((prev: KeywordSearchResult[]) => 
+        prev.map(result => 
+          result.keyword === keyword 
+            ? { ...result, jobs: data.data || [], isLoading: false }
+            : result
+        )
+      );
+
+      // 加载职位描述
+      if (data.data && data.data.length > 0) {
+        data.data.forEach((job: JobInfo) => {
+          setLoadingDescriptions(prev => ({ ...prev, [job.url]: true }));
+          handleLoadDescription(job);
+        });
+      }
+    } catch (error) {
+      setKeywordResults(prev => 
+        prev.map(result => 
+          result.keyword === keyword 
+            ? { ...result, isLoading: false, error: error instanceof Error ? error.message : '搜索失败' }
+            : result
+        )
+      );
+    }
+  };
+
+  const handleAutoSearch = async (resumeText: string) => {
+    setIsGeneratingKeywords(true);
+    setKeywordError(null);
+    setKeywordResults([]);
+    
+    try {
+      const keywordResponse = await fetch('/api/jobs/generate-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeText })
+      });
+
+      if (!keywordResponse.ok) {
+        throw new Error('关键词生成失败');
+      }
+
+      const { keywords } = await keywordResponse.json();
+      if (!keywords || keywords.length < 2) {
+        throw new Error('未能生成有效的职位关键词');
+      }
+
+      setGeneratedKeywords(keywords);
+      
+      // 并行执行两个关键词的搜索
+      keywords.forEach((keyword: string) => handleKeywordSearch(keyword));
+      
+    } catch (error) {
+      setKeywordError(error instanceof Error ? error.message : '自动搜索失败');
+    } finally {
+      setIsGeneratingKeywords(false);
+    }
   };
 
   return (
@@ -490,23 +683,179 @@ export default function JobsPage() {
                       </div>
                     </div>
                   ) : resumeFile && uploadStatus === 'success' ? (
-                    <div className="text-center space-y-4">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
-                        <CheckCircle2 className="w-8 h-8 text-green-500" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-medium text-gray-900">简历分析完成</h3>
-                        <p className="text-sm text-gray-500 mt-1">我们已经为您找到最匹配的职位</p>
-                      </div>
-                      <Button 
-                        className="mt-4"
-                        onClick={() => {
-                          // TODO: 跳转到匹配结果页面
-                        }}
-                      >
-                        查看匹配结果
-                        <ArrowRight className="w-4 h-4 ml-2" />
-                      </Button>
+                    <div className="mt-8 space-y-6">
+                      {isGeneratingKeywords && (
+                        <div className="flex items-center justify-center p-6 bg-white rounded-lg shadow-sm">
+                          <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
+                          <span className="text-gray-600">正在分析简历，生成匹配关键词...</span>
+                        </div>
+                      )}
+
+                      {keywordError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>分析失败</AlertTitle>
+                          <AlertDescription>{keywordError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {keywordResults.length > 0 && (
+                        <div className="space-y-8">
+                          {keywordResults.map((result, index) => (
+                            <div key={index} className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-xl font-semibold text-gray-900">
+                                  匹配方向 {index + 1}：{result.keyword}
+                                </h3>
+                                {result.isLoading ? (
+                                  <div className="flex items-center text-blue-600">
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                    <span>搜索中...</span>
+                                  </div>
+                                ) : result.error ? (
+                                  <span className="text-red-500 text-sm">{result.error}</span>
+                                ) : (
+                                  <span className="text-gray-500">
+                                    找到 {result.jobs.length} 个匹配职位
+                                  </span>
+                                )}
+                              </div>
+
+                              {result.error ? (
+                                <Alert variant="destructive">
+                                  <AlertCircle className="h-4 w-4" />
+                                  <AlertTitle>搜索失败</AlertTitle>
+                                  <AlertDescription>{result.error}</AlertDescription>
+                                </Alert>
+                              ) : (
+                                <div className="grid gap-4">
+                                  {result.jobs.map((job, jobIndex) => (
+                                    <Card key={jobIndex} className="hover:shadow-lg transition-shadow duration-300">
+                                      <div className="flex flex-col md:flex-row">
+                                        {/* 左侧基本信息 */}
+                                        <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
+                                          <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                              <h3 className="text-xl font-semibold text-gray-900">{job.position}</h3>
+                                              <p className="text-base text-gray-600 mt-1">{job.company}</p>
+                                            </div>
+                                            <span className="text-lg font-bold text-blue-600">{job.salary}</span>
+                                          </div>
+                                          <div className="space-y-3">
+                                            <div className="flex items-center text-gray-600">
+                                              <Building2 className="w-4 h-4 mr-2" />
+                                              <span>{job.company}</span>
+                                            </div>
+                                            <div className="flex items-center text-gray-600">
+                                              <MapPin className="w-4 h-4 mr-2" />
+                                              <span>{job.location}</span>
+                                            </div>
+                                            <div className="flex items-center justify-end mt-4">
+                                              <Button
+                                                variant="link"
+                                                className="text-blue-600 hover:text-blue-700"
+                                                onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
+                                              >
+                                                <ExternalLink className="w-4 h-4 mr-1" />
+                                                查看原文
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* 右侧岗位描述 */}
+                                        <div className="flex-1 p-6">
+                                          <div className="h-full">
+                                            <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
+                                            <div className="relative min-h-[200px]">
+                                              {loadingDescriptions[job.url] ? (
+                                                <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
+                                                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                  <p className="text-sm text-gray-500">正在加载岗位描述...</p>
+                                                </div>
+                                              ) : job.description ? (
+                                                <div className="animate-fadeIn">
+                                                  {job.description.includes('获取岗位描述失败') ? (
+                                                    <div className="flex flex-col items-center justify-center space-y-3">
+                                                      <AlertCircle className="w-8 h-8 text-red-500" />
+                                                      <p className="text-sm text-red-500">{job.description}</p>
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleLoadDescription(job)}
+                                                        className="mt-2"
+                                                      >
+                                                        重试加载
+                                                      </Button>
+                                                    </div>
+                                                  ) : (
+                                                    <div className="space-y-4">
+                                                      {job.description.split('\n').map((line, index) => {
+                                                        // 处理主标题
+                                                        if (line.match(/^(职位概述|岗位职责|任职要求|岗位要求|工作职责|薪资待遇)：?$/)) {
+                                                          return (
+                                                            <h4 key={index} className="text-base font-semibold text-gray-900 mt-4">
+                                                              {line}
+                                                            </h4>
+                                                          );
+                                                        }
+                                                        // 处理数字编号的行
+                                                        if (line.match(/^\d+\./)) {
+                                                          return (
+                                                            <div key={index} className="flex items-start space-x-2">
+                                                              <span className="text-blue-500 font-medium">{line.split('.')[0]}.</span>
+                                                              <p className="text-sm text-gray-700 flex-1">{line.split('.').slice(1).join('.').trim()}</p>
+                                                            </div>
+                                                          );
+                                                        }
+                                                        // 处理标题行
+                                                        if (line.startsWith('- ')) {
+                                                          return (
+                                                            <div key={index} className="flex items-start space-x-2">
+                                                              <span className="text-blue-500 mt-1.5">•</span>
+                                                              <p className="text-sm text-gray-700 flex-1">{line.substring(2)}</p>
+                                                            </div>
+                                                          );
+                                                        }
+                                                        // 处理子项
+                                                        if (line.startsWith('  - ')) {
+                                                          return (
+                                                            <div key={index} className="flex items-start space-x-2 ml-4">
+                                                              <span className="text-gray-400 mt-1.5">○</span>
+                                                              <p className="text-sm text-gray-600 flex-1">{line.substring(4)}</p>
+                                                            </div>
+                                                          );
+                                                        }
+                                                        // 处理普通文本
+                                                        if (line.trim()) {
+                                                          return (
+                                                            <p key={index} className="text-sm text-gray-700 leading-relaxed">
+                                                              {line}
+                                                            </p>
+                                                          );
+                                                        }
+                                                        return null;
+                                                      })}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-center justify-center h-full text-gray-500">
+                                                  暂无岗位描述
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </Card>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center space-y-4">
@@ -852,15 +1201,14 @@ export default function JobsPage() {
                                 <span>{job.location}</span>
                               </div>
                               <div className="flex items-center justify-end mt-4">
-                                <a
-                                  href={job.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center text-blue-600 hover:text-blue-700"
+                                <Button
+                                  variant="link"
+                                  className="text-blue-600 hover:text-blue-700"
+                                  onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
                                 >
                                   <ExternalLink className="w-4 h-4 mr-1" />
                                   查看原文
-                                </a>
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -891,7 +1239,54 @@ export default function JobsPage() {
                                         </Button>
                                       </div>
                                     ) : (
-                                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+                                      <div className="space-y-4">
+                                        {job.description.split('\n').map((line, index) => {
+                                          // 处理主标题
+                                          if (line.match(/^(职位概述|岗位职责|任职要求|岗位要求|工作职责|薪资待遇)：?$/)) {
+                                            return (
+                                              <h4 key={index} className="text-base font-semibold text-gray-900 mt-4">
+                                                {line}
+                                              </h4>
+                                            );
+                                          }
+                                          // 处理数字编号的行
+                                          if (line.match(/^\d+\./)) {
+                                            return (
+                                              <div key={index} className="flex items-start space-x-2">
+                                                <span className="text-blue-500 font-medium">{line.split('.')[0]}.</span>
+                                                <p className="text-sm text-gray-700 flex-1">{line.split('.').slice(1).join('.').trim()}</p>
+                                              </div>
+                                            );
+                                          }
+                                          // 处理标题行
+                                          if (line.startsWith('- ')) {
+                                            return (
+                                              <div key={index} className="flex items-start space-x-2">
+                                                <span className="text-blue-500 mt-1.5">•</span>
+                                                <p className="text-sm text-gray-700 flex-1">{line.substring(2)}</p>
+                                              </div>
+                                            );
+                                          }
+                                          // 处理子项
+                                          if (line.startsWith('  - ')) {
+                                            return (
+                                              <div key={index} className="flex items-start space-x-2 ml-4">
+                                                <span className="text-gray-400 mt-1.5">○</span>
+                                                <p className="text-sm text-gray-600 flex-1">{line.substring(4)}</p>
+                                              </div>
+                                            );
+                                          }
+                                          // 处理普通文本
+                                          if (line.trim()) {
+                                            return (
+                                              <p key={index} className="text-sm text-gray-700 leading-relaxed">
+                                                {line}
+                                              </p>
+                                            );
+                                          }
+                                          return null;
+                                        })}
+                                      </div>
                                     )}
                                   </div>
                                 ) : (
