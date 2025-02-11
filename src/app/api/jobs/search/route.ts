@@ -1,3 +1,6 @@
+// 设置 Vercel Serverless Function 超时时间为 60 秒
+export const maxDuration = 60;
+
 import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
 
@@ -29,8 +32,8 @@ interface SearchParams {
 const API_CONFIG = {
   COZE_API_KEY: process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9',
   WORKFLOW_ID: process.env.WORKFLOW_ID || '7460118230254846003',
-  TIMEOUT: 8000, // 8秒超时
-  DEEPSEEK_TIMEOUT: 8000,
+  TIMEOUT: 50000, // 增加到50秒超时
+  DEEPSEEK_TIMEOUT: 50000, // 增加到50秒超时
   MAX_RETRIES: 2,
 };
 
