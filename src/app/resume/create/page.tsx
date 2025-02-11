@@ -38,41 +38,25 @@ type ResumeStep = typeof RESUME_STEPS[keyof typeof RESUME_STEPS];
 interface Education {
   school: string;
   degree: string;
-  fieldOfStudy?: string;
-  startDate: string;
-  endDate: string;
-  achievements?: string[];
+  major?: string;
+  start_year: string;
+  end_year: string;
+  extra?: string;
 }
 
 interface WorkExperience {
   company: string;
-  position: string;
-  startDate: string;
-  endDate: string;
+  role: string;
+  start_year: string;
+  end_year: string;
   responsibilities: string[];
 }
 
 interface Project {
-  name: string;
-  role?: string;
-  startDate: string;
-  endDate: string;
-  description: string[];
-  technologies?: string[];
-}
-
-interface ResumeData {
-  basic_info: {
-    name: string;
-    phone: string;
-    email: string;
-  };
-  target_job?: string;
-  education: Education[];
-  work_experience: WorkExperience[];
-  projects: Project[];
-  skills?: string[];
-  certifications?: string[];
+  title: string;
+  start_year: string;
+  end_year: string;
+  responsibilities: string[];
 }
 
 // 系统提示词，包含完整的对话策略
@@ -185,10 +169,25 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 
 const WELCOME_MESSAGE = {
   id: 'welcome',
-  role: 'assistant',
+  role: 'assistant' as const,
   content: `您好！我是您的简历助手，让我一步步完成您的专业简历。
 
 我们开始吧，您可以先告诉我您的姓名、联系电话和邮箱。`
+};
+
+const COMPLETION_MESSAGE = {
+  id: 'completion',
+  role: 'assistant' as const,
+  content: `恭喜您完成了简历信息的收集！🎉
+
+我们正在马不停蹄地开发更多功能：
+- 自定义简历模板功能
+- PDF/Word格式简历下载
+- 在线简历编辑器
+  
+预计这些功能将在未来2周内陆续上线，敬请期待！
+
+您可以点击左上角的"返回列表"按钮回到简历列表页面。`
 };
 
 const CreateResume = () => {
@@ -208,6 +207,7 @@ const CreateResume = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [showThinking, setShowThinking] = useState(false);
+  const [showCompletionMessage, setShowCompletionMessage] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -383,7 +383,11 @@ const CreateResume = () => {
   }, [resumeData]);
 
   // 合并欢迎消息和API消息
-  const messages = [WELCOME_MESSAGE, ...apiMessages.filter(msg => msg.role !== 'system')];
+  const allMessages = [
+    WELCOME_MESSAGE,
+    ...apiMessages.filter(msg => msg.role !== 'system'),
+    ...(showCompletionMessage ? [COMPLETION_MESSAGE] : [])
+  ];
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -393,7 +397,7 @@ const CreateResume = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [allMessages]);
 
   // 判断步骤是否完成
   const isStepCompleted = (step: ResumeStep) => {
@@ -523,35 +527,11 @@ const CreateResume = () => {
     await handleChatSubmit(e);
   };
 
-  const handleExampleSubmit = () => {
-    const sampleData: ResumeData = {
-      basic_info: {
-        name: "张三",
-        phone: "13800138000",
-        email: "zhangsan@example.com"
-      },
-      target_job: "前端开发工程师",
-      education: [
-        {
-          school: "示例大学",
-          major: "计算机科学",
-          degree: "本科",
-          start_year: "2019",
-          end_year: "2023",
-          extra: "优秀毕业生"
-        }
-      ],
-      work_experience: [],
-      projects: [],
-      skills: ["JavaScript", "React", "TypeScript"],
-      certifications: [],
-      meta: {
-        template: "default"
-      }
-    };
-
-    setResumeData(sampleData);
-    router.push("/resume/choose-template");
+  const handleFinalSubmit = () => {
+    if (currentStep === RESUME_STEPS.CONFIRM) {
+      setResumeData(resumeData);
+      setShowCompletionMessage(true);
+    }
   };
 
   return (
@@ -616,7 +596,7 @@ const CreateResume = () => {
         <div className="flex-1 overflow-y-auto pt-24 pb-32 scroll-smooth">
           <div className="flex flex-col px-6 min-h-full">
             <AnimatePresence mode="popLayout">
-              {messages.map((message) => (
+              {allMessages.map((message) => (
                 message.role !== 'system' && (
                   <motion.div
                     key={message.id}
@@ -737,10 +717,10 @@ const CreateResume = () => {
           {currentStep === RESUME_STEPS.CONFIRM && (
             <div className="pt-4 border-t border-gray-200">
               <Button 
-                className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
-                onClick={handleExampleSubmit}
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-6 rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
+                onClick={handleFinalSubmit}
               >
-                使用示例数据继续
+                完成创建
               </Button>
             </div>
           )}
