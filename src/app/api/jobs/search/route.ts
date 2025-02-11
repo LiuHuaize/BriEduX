@@ -32,8 +32,8 @@ interface SearchParams {
 const API_CONFIG = {
   COZE_API_KEY: process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9',
   WORKFLOW_ID: process.env.WORKFLOW_ID || '7460118230254846003',
-  TIMEOUT: 50000, // 增加到50秒超时
-  DEEPSEEK_TIMEOUT: 50000, // 增加到50秒超时
+  TIMEOUT: 50000,
+  DEEPSEEK_TIMEOUT: 50000,
   MAX_RETRIES: 2,
 };
 
@@ -52,6 +52,9 @@ const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任
 3. 确保所有字段都经过清理和标准化
 4. 保持原始数据的完整性
 5. 如果某个字段缺失，使用空字符串代替
+6. 特别注意从文本中的Markdown链接格式（[链接标题](URL)）中提取URL
+7. 确保每个职位的URL与对应的职位信息完全匹配
+8. 如果找不到对应的URL，将url字段设置为空字符串
 
 输出格式示例：
 {
@@ -65,32 +68,6 @@ const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任
     }
   ]
 }`;
-
-// 添加URL提取的辅助函数
-function extractUrlsFromMarkdown(text: string): Map<string, string> {
-  const urlMap = new Map<string, string>();
-  const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-  let match;
-
-  while ((match = markdownLinkRegex.exec(text)) !== null) {
-    const [_, title, url] = match;
-    urlMap.set(title.trim(), url.trim());
-  }
-
-  return urlMap;
-}
-
-function findUrlForJob(jobDescription: string, urlMap: Map<string, string>): string {
-  const entries = Array.from(urlMap.entries());
-  
-  for (const [title, url] of entries) {
-    if (jobDescription.includes(title)) {
-      return url.replace(/\)$/, '');
-    }
-  }
-  
-  return '';
-}
 
 // 添加超时控制的fetch函数
 async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }) {
@@ -156,7 +133,7 @@ async function callDeepseekAPI(text: string, retryCount = 0) {
         },
         {
           role: 'user',
-          content: `请将以下职位信息解析为结构化的JSON数据：\n\n${text}\n\n请只返回JSON格式的数据，不要包含任何其他解释或说明。`
+          content: `请将以下职位信息解析为结构化的JSON数据：\n\n${text}\n\n请确保从原始文本中提取所有URL信息，并正确对应到每个职位条目。只返回JSON格式的数据，不要包含任何其他解释或说明。`
         }
       ],
       temperature: 0.1,
@@ -164,7 +141,17 @@ async function callDeepseekAPI(text: string, retryCount = 0) {
       response_format: { type: "json_object" }
     });
 
-    return completion.choices[0].message.content;
+    const rawContent = completion.choices[0].message.content;
+    if (!rawContent) {
+      throw new Error('Deepseek API 返回内容为空');
+    }
+    
+    // 清理返回内容中的Markdown代码块标记
+    let content = rawContent.replace(/^```json\n/, '').replace(/\n```$/, '');
+    // 清理可能存在的其他Markdown标记
+    content = content.replace(/^```\n/, '').replace(/\n```$/, '');
+    
+    return content;
   } catch (error) {
     if (retryCount < API_CONFIG.MAX_RETRIES) {
       console.log(`Retrying Deepseek API call, attempt ${retryCount + 1}`);
@@ -187,20 +174,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // 并行调用API
-    const [cozeData, _] = await Promise.all([
-      callCozeAPI(body.query),
-      new Promise(resolve => setTimeout(resolve, 100)) // 添加小延迟以确保不会立即超时
-    ]);
-
+    // 调用Coze API获取职位信息
+    const cozeData = await callCozeAPI(body.query);
     console.log('Coze API 返回数据:', cozeData);
     
     const parsedData = JSON.parse(cozeData.data);
     console.log('解析后的 Coze 数据:', parsedData);
-
-    // 从原始文本中提取URL映射
-    const urlMap = extractUrlsFromMarkdown(parsedData.output);
-    console.log('提取到的URL映射:', Object.fromEntries(urlMap));
     
     // 调用 Deepseek API 解析数据
     const content = await callDeepseekAPI(parsedData.output);
@@ -210,43 +189,26 @@ export async function POST(request: Request) {
     
     console.log('Deepseek API 返回内容:', content);
     
+    // 解析JSON响应
     let jobListings;
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : content;
-      jobListings = JSON.parse(jsonStr);
-      
-      // 补充或修正URL
-      if (jobListings.jobs && Array.isArray(jobListings.jobs)) {
-        jobListings.jobs = jobListings.jobs.map((job: JobInfo) => {
-          if (!job.url) {
-            const jobDescription = `${job.position}：${job.company}招聘，工作地点在${job.location}，薪资为${job.salary}`;
-            job.url = findUrlForJob(jobDescription, urlMap);
-          }
-          return job;
-        });
-      }
-
-      console.log('解析后的工作列表:', jobListings);
-      
-      if (!jobListings.jobs || !Array.isArray(jobListings.jobs)) {
-        throw new Error('解析结果格式不正确');
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: jobListings.jobs,
-        output: parsedData.output,
-        debug_url: cozeData.debug_url
-      });
-    } catch (parseError) {
-      console.error('JSON 解析错误:', parseError);
-      return NextResponse.json({
-        error: '数据解析失败',
-        details: parseError instanceof Error ? parseError.message : String(parseError),
-        raw_content: content
-      }, { status: 500 });
+      jobListings = JSON.parse(content);
+    } catch (error) {
+      console.error('JSON解析错误，原始内容:', content);
+      throw new Error(`JSON解析失败: ${error instanceof Error ? error.message : String(error)}`);
     }
+    
+    // 验证数据结构
+    if (!jobListings.jobs || !Array.isArray(jobListings.jobs)) {
+      throw new Error('解析结果格式不正确');
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: jobListings.jobs,
+      output: parsedData.output,
+      debug_url: cozeData.debug_url
+    });
 
   } catch (error) {
     console.error('API 错误:', error);
