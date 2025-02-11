@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// 测试 Vercel 部署配置
 const nextConfig = {
   images: {
     dangerouslyAllowSVG: true,
