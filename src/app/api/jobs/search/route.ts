@@ -178,11 +178,8 @@ export async function POST(request: Request) {
     const cozeData = await callCozeAPI(body.query);
     console.log('Coze API 返回数据:', cozeData);
     
-    const parsedData = JSON.parse(cozeData.data);
-    console.log('解析后的 Coze 数据:', parsedData);
-    
     // 调用 Deepseek API 解析数据
-    const content = await callDeepseekAPI(parsedData.output);
+    const content = await callDeepseekAPI(cozeData.data);
     if (!content) {
       throw new Error('Deepseek API 返回内容为空');
     }
@@ -206,7 +203,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: jobListings.jobs,
-      output: parsedData.output,
+      output: cozeData.data,
       debug_url: cozeData.debug_url
     });
 
