@@ -25,13 +25,20 @@ interface SearchParams {
   query: string;
 }
 
-const COZE_API_KEY = process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9';
-const WORKFLOW_ID = process.env.WORKFLOW_ID || '7460118230254846003';
+// API配置
+const API_CONFIG = {
+  COZE_API_KEY: process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9',
+  WORKFLOW_ID: process.env.WORKFLOW_ID || '7460118230254846003',
+  TIMEOUT: 8000, // 8秒超时
+  DEEPSEEK_TIMEOUT: 8000,
+  MAX_RETRIES: 2,
+};
 
 // 创建 OpenAI 客户端
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_SINGLE_API_KEY || '',
   baseURL: 'https://www.gptapi.us/v1',
+  timeout: API_CONFIG.DEEPSEEK_TIMEOUT,
 });
 
 const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任务是将输入的职位信息文本解析为结构化的JSON数据。
@@ -82,6 +89,88 @@ function findUrlForJob(jobDescription: string, urlMap: Map<string, string>): str
   return '';
 }
 
+// 添加超时控制的fetch函数
+async function fetchWithTimeout(url: string, options: RequestInit & { timeout?: number }) {
+  const { timeout = API_CONFIG.TIMEOUT, ...fetchOptions } = options;
+  
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  
+  try {
+    const response = await fetch(url, {
+      ...fetchOptions,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
+// Coze API调用函数
+async function callCozeAPI(query: string, retryCount = 0): Promise<CozeResponse> {
+  try {
+    const response = await fetchWithTimeout('https://api.coze.cn/v1/workflow/run', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_CONFIG.COZE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        parameters: {
+          job_title: query
+        },
+        workflow_id: API_CONFIG.WORKFLOW_ID
+      }),
+      timeout: API_CONFIG.TIMEOUT
+    });
+
+    if (!response.ok) {
+      throw new Error(`Coze API failed with status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (retryCount < API_CONFIG.MAX_RETRIES) {
+      console.log(`Retrying Coze API call, attempt ${retryCount + 1}`);
+      return callCozeAPI(query, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
+// Deepseek API调用函数
+async function callDeepseekAPI(text: string, retryCount = 0) {
+  try {
+    const completion = await client.chat.completions.create({
+      model: 'deepseek-v3',
+      messages: [
+        {
+          role: 'system',
+          content: PARSE_SYSTEM_PROMPT
+        },
+        {
+          role: 'user',
+          content: `请将以下职位信息解析为结构化的JSON数据：\n\n${text}\n\n请只返回JSON格式的数据，不要包含任何其他解释或说明。`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 2000,
+      response_format: { type: "json_object" }
+    });
+
+    return completion.choices[0].message.content;
+  } catch (error) {
+    if (retryCount < API_CONFIG.MAX_RETRIES) {
+      console.log(`Retrying Deepseek API call, attempt ${retryCount + 1}`);
+      return callDeepseekAPI(text, retryCount + 1);
+    }
+    throw error;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // 解析请求体
@@ -95,26 +184,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // 调用 Coze API 搜索工作
-    const cozeResponse = await fetch('https://api.coze.cn/v1/workflow/run', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${COZE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        parameters: {
-          job_title: body.query
-        },
-        workflow_id: WORKFLOW_ID
-      })
-    });
+    // 并行调用API
+    const [cozeData, _] = await Promise.all([
+      callCozeAPI(body.query),
+      new Promise(resolve => setTimeout(resolve, 100)) // 添加小延迟以确保不会立即超时
+    ]);
 
-    if (!cozeResponse.ok) {
-      throw new Error('Coze API 调用失败');
-    }
-
-    const cozeData: CozeResponse = await cozeResponse.json();
     console.log('Coze API 返回数据:', cozeData);
     
     const parsedData = JSON.parse(cozeData.data);
@@ -124,25 +199,8 @@ export async function POST(request: Request) {
     const urlMap = extractUrlsFromMarkdown(parsedData.output);
     console.log('提取到的URL映射:', Object.fromEntries(urlMap));
     
-    // 使用 Deepseek API 解析数据
-    const completion = await client.chat.completions.create({
-      model: 'deepseek-v3',
-      messages: [
-        {
-          role: 'system',
-          content: PARSE_SYSTEM_PROMPT
-        },
-        {
-          role: 'user',
-          content: `请将以下职位信息解析为结构化的JSON数据：\n\n${parsedData.output}\n\n请只返回JSON格式的数据，不要包含任何其他解释或说明。`
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 2000,
-      response_format: { type: "json_object" }
-    });
-
-    const content = completion.choices[0].message.content;
+    // 调用 Deepseek API 解析数据
+    const content = await callDeepseekAPI(parsedData.output);
     if (!content) {
       throw new Error('Deepseek API 返回内容为空');
     }
@@ -159,7 +217,6 @@ export async function POST(request: Request) {
       if (jobListings.jobs && Array.isArray(jobListings.jobs)) {
         jobListings.jobs = jobListings.jobs.map((job: JobInfo) => {
           if (!job.url) {
-            // 尝试从职位描述中找到对应的URL
             const jobDescription = `${job.position}：${job.company}招聘，工作地点在${job.location}，薪资为${job.salary}`;
             job.url = findUrlForJob(jobDescription, urlMap);
           }
