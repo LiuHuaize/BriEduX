@@ -1,5 +1,7 @@
+// 设置 Vercel Serverless Function 超时时间为 60 秒
+export const maxDuration = 60;
+
 import { NextResponse } from 'next/server';
-import getConfig from 'next/config';
 
 // 定义 API 响应的类型
 interface CozeResponse {
@@ -14,9 +16,12 @@ interface CozeResponse {
 const COZE_API_KEY = process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9';
 const WORKFLOW_ID = '7468552721685512242';
 
-// 获取配置
-const { publicRuntimeConfig } = getConfig();
-const API_TIMEOUT = publicRuntimeConfig?.API_TIMEOUT || 30000; // 默认30秒
+// API配置
+const API_CONFIG = {
+  TIMEOUT: 50000, // 50秒超时
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000,
+};
 
 // 添加超时控制的fetch函数
 const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number) => {
@@ -39,8 +44,8 @@ const fetchWithTimeout = async (url: string, options: RequestInit, timeout: numb
 // 重试函数
 const retry = async <T>(
   fn: () => Promise<T>,
-  retries: number = 3,
-  delay: number = 1000,
+  retries: number = API_CONFIG.MAX_RETRIES,
+  delay: number = API_CONFIG.RETRY_DELAY,
 ): Promise<T> => {
   try {
     return await fn();
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
             workflow_id: WORKFLOW_ID
           })
         },
-        API_TIMEOUT
+        API_CONFIG.TIMEOUT
       );
 
       if (!response.ok) {
