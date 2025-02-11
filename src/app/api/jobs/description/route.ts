@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import getConfig from 'next/config';
 
 // 定义 API 响应的类型
 interface CozeResponse {
@@ -13,6 +14,43 @@ interface CozeResponse {
 const COZE_API_KEY = process.env.COZE_API_KEY || 'pat_HYdaq6FMk4Ad2gmFbfHETnetfrdRi0ghyElWdOwhRJSiKwyxrInoQfEcm88FBxD9';
 const WORKFLOW_ID = '7468552721685512242';
 
+// 获取配置
+const { publicRuntimeConfig } = getConfig();
+const API_TIMEOUT = publicRuntimeConfig?.API_TIMEOUT || 30000; // 默认30秒
+
+// 添加超时控制的fetch函数
+const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+};
+
+// 重试函数
+const retry = async <T>(
+  fn: () => Promise<T>,
+  retries: number = 3,
+  delay: number = 1000,
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries === 0) throw error;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return retry(fn, retries - 1, delay * 2);
+  }
+};
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -25,24 +63,32 @@ export async function POST(request: Request) {
       );
     }
 
-    // 调用 Coze API 获取岗位描述
-    const cozeResponse = await fetch('https://api.coze.cn/v1/workflow/run', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${COZE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        parameters: {
-          input: url
+    // 使用重试机制调用 Coze API
+    const cozeResponse = await retry(async () => {
+      const response = await fetchWithTimeout(
+        'https://api.coze.cn/v1/workflow/run',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${COZE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            parameters: {
+              input: url
+            },
+            workflow_id: WORKFLOW_ID
+          })
         },
-        workflow_id: WORKFLOW_ID
-      })
-    });
+        API_TIMEOUT
+      );
 
-    if (!cozeResponse.ok) {
-      throw new Error('Coze API 调用失败');
-    }
+      if (!response.ok) {
+        throw new Error(`Coze API 调用失败: ${response.status} ${response.statusText}`);
+      }
+
+      return response;
+    });
 
     const cozeData: CozeResponse = await cozeResponse.json();
     console.log('Coze API 返回数据:', cozeData);

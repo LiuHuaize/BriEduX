@@ -335,37 +335,63 @@ export default function JobsPage() {
     });
   };
 
-  // 添加加载描述的处理函数
+  // 修改 handleLoadDescription 函数
   const handleLoadDescription = async (job: JobInfo) => {
     if (job.description || loadingDescriptions[job.url]) return;
     
     setLoadingDescriptions(prev => ({ ...prev, [job.url]: true }));
-    try {
-      const descResponse = await fetch('/api/jobs/description', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: job.url }),
-      });
+    let retries = 3;
+    
+    while (retries > 0) {
+      try {
+        const descResponse = await fetch('/api/jobs/description', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url: job.url }),
+        });
 
-      if (descResponse.ok) {
-        const descData = await descResponse.json();
-        if (descData.success && descData.data.description) {
+        if (descResponse.ok) {
+          const descData = await descResponse.json();
+          if (descData.success && descData.data.description) {
+            setSearchResults(prev => 
+              prev.map(j => 
+                j.url === job.url 
+                  ? { ...j, description: descData.data.description }
+                  : j
+              )
+            );
+            break; // 成功获取描述，跳出重试循环
+          }
+        } else if (descResponse.status === 504) {
+          // 如果是超时错误，等待后重试
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          retries--;
+          continue;
+        }
+        
+        throw new Error('获取岗位描述失败');
+      } catch (error) {
+        console.error('获取岗位描述失败:', error);
+        retries--;
+        if (retries === 0) {
+          // 所有重试都失败了，显示错误信息
           setSearchResults(prev => 
             prev.map(j => 
               j.url === job.url 
-                ? { ...j, description: descData.data.description }
+                ? { ...j, description: '获取岗位描述失败，请稍后重试' }
                 : j
             )
           );
+        } else {
+          // 等待一段时间后重试
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-    } catch (error) {
-      console.error('获取岗位描述失败:', error);
-    } finally {
-      setLoadingDescriptions(prev => ({ ...prev, [job.url]: false }));
     }
+    
+    setLoadingDescriptions(prev => ({ ...prev, [job.url]: false }));
   };
 
   return (
@@ -851,7 +877,22 @@ export default function JobsPage() {
                                   </div>
                                 ) : job.description ? (
                                   <div className="animate-fadeIn">
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+                                    {job.description.includes('获取岗位描述失败') ? (
+                                      <div className="flex flex-col items-center justify-center space-y-3">
+                                        <AlertCircle className="w-8 h-8 text-red-500" />
+                                        <p className="text-sm text-red-500">{job.description}</p>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleLoadDescription(job)}
+                                          className="mt-2"
+                                        >
+                                          重试加载
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="flex items-center justify-center h-full text-gray-500">

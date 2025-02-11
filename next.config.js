@@ -29,6 +29,7 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['@radix-ui/react-icons', 'lucide-react'],
+    serverComponentsExternalPackages: ['puppeteer-core'],
   },
   typescript: {
     // !! WARN !!
@@ -59,6 +60,13 @@ const nextConfig = {
   distDir: '.next',
   generateBuildId: async () => {
     return 'build-' + Date.now()
+  },
+  // 添加 Serverless 函数配置
+  serverRuntimeConfig: {
+    PROJECT_ROOT: __dirname
+  },
+  publicRuntimeConfig: {
+    API_TIMEOUT: 60000 // 60秒超时
   }
 }
 
