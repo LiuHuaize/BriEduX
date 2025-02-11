@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { createClient } from '@supabase/supabase-js';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
-
-const execFileAsync = promisify(execFile);
 
 // 创建 Supabase 客户端
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+const COZE_API_KEY = process.env.COZE_API_KEY!;
+const COZE_WORKFLOW_ID = '7470141462618570804';
 
 export async function POST(request: Request) {
   try {
@@ -22,62 +18,47 @@ export async function POST(request: Request) {
 
     console.log('开始处理文件:', filePath);
 
-    // 从 Supabase Storage 下载文件
-    const { data, error } = await supabase.storage
-      .from('resume')
-      .download(filePath);
+    // 构建完整的文件URL
+    const fileUrl = `${supabaseUrl}/storage/v1/object/public/resume/${filePath}`;
+    console.log('文件URL:', fileUrl);
 
-    if (error) {
-      console.error('Supabase 下载错误:', error);
+    // 调用Coze API
+    const cozeResponse = await fetch('https://api.coze.cn/v1/workflow/run', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${COZE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        parameters: {
+          input: fileUrl
+        },
+        workflow_id: COZE_WORKFLOW_ID
+      })
+    });
+
+    if (!cozeResponse.ok) {
+      const errorData = await cozeResponse.text();
+      console.error('Coze API错误:', errorData);
       return NextResponse.json({ 
-        error: '文件下载失败',
-        details: error.message 
+        error: 'PDF转换失败',
+        details: errorData 
       }, { status: 500 });
     }
 
-    if (!data) {
-      console.error('没有接收到文件数据');
+    const cozeData = await cozeResponse.json();
+    
+    if (cozeData.code !== 0) {
       return NextResponse.json({ 
-        error: '文件下载失败: 没有接收到数据'
+        error: '转换失败',
+        details: cozeData.msg 
       }, { status: 500 });
     }
 
-    // 将文件保存到临时目录
-    const tempFilePath = join(tmpdir(), `temp_${Date.now()}.pdf`);
-    console.log('保存文件到临时路径:', tempFilePath);
-
-    try {
-      await writeFile(tempFilePath, Buffer.from(await data.arrayBuffer()));
-    } catch (writeError) {
-      console.error('文件写入错误:', writeError);
-      return NextResponse.json({ 
-        error: '文件保存失败',
-        details: writeError instanceof Error ? writeError.message : String(writeError)
-      }, { status: 500 });
-    }
-
-    // 假设 Python 脚本在项目根目录下的 scripts 文件夹内
-    const scriptPath = join(process.cwd(), 'scripts', 'pdf_to_markdown.py');
-    console.log('使用脚本路径:', scriptPath);
-
-    try {
-      const { stdout, stderr } = await execFileAsync('python3', [scriptPath, tempFilePath]);
-      if (stderr) {
-        console.error('Python脚本错误:', stderr);
-        return NextResponse.json({ 
-          error: '转换失败',
-          details: stderr 
-        }, { status: 500 });
-      }
-      console.log('转换成功');
-      return NextResponse.json({ markdown: stdout });
-    } catch (execError) {
-      console.error('执行Python脚本错误:', execError);
-      return NextResponse.json({ 
-        error: '执行转换脚本失败',
-        details: execError instanceof Error ? execError.message : String(execError)
-      }, { status: 500 });
-    }
+    // 解析返回的数据
+    const outputData = JSON.parse(cozeData.data);
+    
+    return NextResponse.json({ markdown: outputData.output });
   } catch (error) {
     console.error('API错误:', error);
     return NextResponse.json({ 
