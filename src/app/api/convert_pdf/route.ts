@@ -1,12 +1,9 @@
-import { NextResponse } from 'next/server';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { createClient } from '@supabase/supabase-js';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { tmpdir } from 'os';
+// 设置 Vercel Serverless Function 超时时间为 60 秒
+export const maxDuration = 60;
 
-const execFileAsync = promisify(execFile);
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import pdf from 'pdf-parse';
 
 // 创建 Supabase 客户端
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -23,59 +20,48 @@ export async function POST(request: Request) {
     console.log('开始处理文件:', filePath);
 
     // 从 Supabase Storage 下载文件
-    const { data, error } = await supabase.storage
+    const { data: fileData, error: downloadError } = await supabase.storage
       .from('resume')
       .download(filePath);
 
-    if (error) {
-      console.error('Supabase 下载错误:', error);
+    if (downloadError) {
+      console.error('Supabase 下载错误:', downloadError);
       return NextResponse.json({ 
         error: '文件下载失败',
-        details: error.message 
+        details: downloadError.message 
       }, { status: 500 });
     }
 
-    if (!data) {
+    if (!fileData) {
       console.error('没有接收到文件数据');
       return NextResponse.json({ 
         error: '文件下载失败: 没有接收到数据'
       }, { status: 500 });
     }
 
-    // 将文件保存到临时目录
-    const tempFilePath = join(tmpdir(), `temp_${Date.now()}.pdf`);
-    console.log('保存文件到临时路径:', tempFilePath);
-
     try {
-      await writeFile(tempFilePath, Buffer.from(await data.arrayBuffer()));
-    } catch (writeError) {
-      console.error('文件写入错误:', writeError);
-      return NextResponse.json({ 
-        error: '文件保存失败',
-        details: writeError instanceof Error ? writeError.message : String(writeError)
-      }, { status: 500 });
-    }
+      // 将文件数据转换为 Buffer
+      const buffer = Buffer.from(await fileData.arrayBuffer());
+      
+      // 使用 pdf-parse 解析 PDF
+      const data = await pdf(buffer);
+      
+      // 提取文本内容并进行基本格式化
+      const text = data.text
+        .replace(/\n{3,}/g, '\n\n') // 替换多个换行为两个换行
+        .replace(/\s{2,}/g, ' ') // 替换多个空格为一个空格
+        .trim();
 
-    // 假设 Python 脚本在项目根目录下的 scripts 文件夹内
-    const scriptPath = join(process.cwd(), 'scripts', 'pdf_to_markdown.py');
-    console.log('使用脚本路径:', scriptPath);
+      // 将文本转换为 Markdown 格式
+      const markdown = `# 简历内容\n\n${text}`;
 
-    try {
-      const { stdout, stderr } = await execFileAsync('python3', [scriptPath, tempFilePath]);
-      if (stderr) {
-        console.error('Python脚本错误:', stderr);
-        return NextResponse.json({ 
-          error: '转换失败',
-          details: stderr 
-        }, { status: 500 });
-      }
       console.log('转换成功');
-      return NextResponse.json({ markdown: stdout });
-    } catch (execError) {
-      console.error('执行Python脚本错误:', execError);
+      return NextResponse.json({ markdown });
+    } catch (parseError) {
+      console.error('PDF 解析错误:', parseError);
       return NextResponse.json({ 
-        error: '执行转换脚本失败',
-        details: execError instanceof Error ? execError.message : String(execError)
+        error: 'PDF 解析失败',
+        details: parseError instanceof Error ? parseError.message : String(parseError)
       }, { status: 500 });
     }
   } catch (error) {
