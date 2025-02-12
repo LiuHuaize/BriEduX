@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { BackgroundTiles } from '@/components/ui/background-tiles'
-import { AuthProvider } from "@/lib/contexts/AuthContext"
 import { NavigationProvider } from '@/components/providers/navigation-provider'
 
 const inter = Inter({ 
@@ -26,19 +25,17 @@ export default function RootLayout({
   return (
     <html lang="zh" className={inter.variable}>
       <body className={inter.className}>
-        <AuthProvider>
-          <div className="relative min-h-screen">
-            <div className="fixed inset-0 z-0">
-              <BackgroundTiles />
-            </div>
-            <div className="relative z-10">
-              <NavigationProvider />
-              <main className="w-full">
-                {children}
-              </main>
-            </div>
+        <div className="relative min-h-screen">
+          <div className="fixed inset-0 z-0">
+            <BackgroundTiles />
           </div>
-        </AuthProvider>
+          <div className="relative z-10">
+            <NavigationProvider />
+            <main className="w-full">
+              {children}
+            </main>
+          </div>
+        </div>
       </body>
     </html>
   )

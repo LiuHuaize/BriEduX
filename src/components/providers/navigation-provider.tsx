@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import { NavBarDemo } from '@/components/nav-bar-demo'
-import { UserMenu } from '@/components/ui/user-menu'
 
 export function NavigationProvider() {
   const pathname = usePathname()
@@ -12,10 +11,5 @@ export function NavigationProvider() {
     return null;
   }
 
-  return (
-    <>
-      <NavBarDemo />
-      <UserMenu />
-    </>
-  );
+  return <NavBarDemo />;
 } 

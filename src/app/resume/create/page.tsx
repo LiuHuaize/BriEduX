@@ -329,12 +329,12 @@ const CreateResume = () => {
 
   // 验证基础信息是否完整
   const validateBasicInfo = () => {
-    let { name, phone, email } = resumeData.basic_info;
+    let { name = '', phone = '', email = '' } = resumeData.basic_info || {};
 
     const isValid = {
-      name: name.length >= 2,
-      phone: phone.trim() !== '',
-      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      name: (name || '').length >= 2,
+      phone: (phone || '').trim() !== '',
+      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '')
     };
 
     const isComplete = isValid.name && isValid.phone && isValid.email;

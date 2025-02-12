@@ -1,7 +1,7 @@
 "use client"
 
 import { Home, FileText, Briefcase, LineChart } from 'lucide-react'
-import { NavBar } from "@/components/ui/tubelight-navbar"
+import { NavBar } from '@/components/ui/tubelight-navbar'
 
 export function NavBarDemo() {
   const navItems = [
