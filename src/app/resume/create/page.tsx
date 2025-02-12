@@ -211,6 +211,14 @@ const CreateResume = () => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isMounted = useRef(true);
+
+  // 在组件卸载时更新挂载状态
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   // 解析AI助手的回复,更新简历数据
   const parseAIResponse = async (content: string) => {
@@ -296,14 +304,21 @@ const CreateResume = () => {
       }
     ],
     onFinish: (message) => {
-      // 分析AI回复，更新当前步骤和简历数据
-      parseAIResponse(message.content);
-      // 延迟更新步骤，确保数据先被更新
-      setTimeout(() => updateStepBasedOnResponse(), 0);
+      // 只在组件挂载时更新状态
+      if (isMounted.current) {
+        parseAIResponse(message.content);
+        setTimeout(() => {
+          if (isMounted.current) {
+            updateStepBasedOnResponse();
+          }
+        }, 0);
+      }
     },
     onResponse: (response) => {
-      // 在开始接收响应时隐藏加载状态
-      setShowThinking(false);
+      // 只在组件挂载时更新状态
+      if (isMounted.current) {
+        setShowThinking(false);
+      }
     }
   });
 
@@ -516,13 +531,17 @@ const CreateResume = () => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    setShowThinking(true);
+    if (isMounted.current) {
+      setShowThinking(true);
+    }
     
     try {
       await handleChatSubmit(e);
     } catch (error) {
       console.error('Error submitting chat:', error);
-      setShowThinking(false);
+      if (isMounted.current) {
+        setShowThinking(false);
+      }
     }
   };
 
