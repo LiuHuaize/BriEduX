@@ -313,14 +313,18 @@ const CreateResume = () => {
           }
         }, 0);
       }
-    },
-    onResponse: (response) => {
-      // 只在组件挂载时更新状态
-      if (isMounted.current) {
+    }
+  });
+
+  // 监听消息变化，当有新消息时隐藏 loading
+  useEffect(() => {
+    if (apiMessages.length > 0 && isMounted.current) {
+      const lastMessage = apiMessages[apiMessages.length - 1];
+      if (lastMessage.role === 'assistant' && lastMessage.content) {
         setShowThinking(false);
       }
     }
-  });
+  }, [apiMessages]);
 
   // 分析AI回复，更新当前步骤
   const updateStepBasedOnResponse = () => {
