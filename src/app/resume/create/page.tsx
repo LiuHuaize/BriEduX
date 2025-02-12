@@ -299,10 +299,10 @@ const CreateResume = () => {
       // 分析AI回复，更新当前步骤和简历数据
       parseAIResponse(message.content);
       // 延迟更新步骤，确保数据先被更新
-      setTimeout(() => updateStepBasedOnResponse(message.content), 0);
+      setTimeout(() => updateStepBasedOnResponse(), 0);
     },
-    onResponse: () => {
-      // 在开始生成回复时立即隐藏loading
+    onResponse: (response) => {
+      // 在开始接收响应时隐藏加载状态
       setShowThinking(false);
     }
   });
@@ -518,13 +518,12 @@ const CreateResume = () => {
 
     setShowThinking(true);
     
-    // 添加调试信息
-    console.log('Current Step:', currentStep);
-    console.log('User Input:', input);
-    console.log('Current Resume Data:', resumeData);
-    
-    // 调用聊天提交
-    await handleChatSubmit(e);
+    try {
+      await handleChatSubmit(e);
+    } catch (error) {
+      console.error('Error submitting chat:', error);
+      setShowThinking(false);
+    }
   };
 
   const handleFinalSubmit = () => {
