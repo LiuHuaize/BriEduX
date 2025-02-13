@@ -734,23 +734,27 @@ export default function JobsPage() {
                                       <div className="flex flex-col md:flex-row">
                                         {/* 左侧基本信息 */}
                                         <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
-                                          <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                              <h3 className="text-xl font-semibold text-gray-900">{job.position}</h3>
-                                              <p className="text-base text-gray-600 mt-1">{job.company}</p>
+                                          <div className="flex flex-col space-y-4">
+                                            <div className="flex flex-col space-y-2">
+                                              <h3 className="text-xl font-semibold text-gray-900 break-words line-clamp-2 hover:line-clamp-none">{job.position}</h3>
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-base text-gray-600 break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                                <span className="text-lg font-bold text-blue-600 whitespace-nowrap ml-2">{job.salary}</span>
+                                              </div>
                                             </div>
-                                            <span className="text-lg font-bold text-blue-600">{job.salary}</span>
-                                          </div>
-                                          <div className="space-y-3">
-                                            <div className="flex items-center text-gray-600">
-                                              <Building2 className="w-4 h-4 mr-2" />
-                                              <span>{job.company}</span>
+                                            
+                                            <div className="space-y-3 pt-2">
+                                              <div className="flex items-center text-gray-600">
+                                                <Building2 className="w-4 h-4 min-w-[16px] mr-2" />
+                                                <span className="break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                              </div>
+                                              <div className="flex items-center text-gray-600">
+                                                <MapPin className="w-4 h-4 min-w-[16px] mr-2" />
+                                                <span className="break-words line-clamp-1 hover:line-clamp-none">{job.location}</span>
+                                              </div>
                                             </div>
-                                            <div className="flex items-center text-gray-600">
-                                              <MapPin className="w-4 h-4 mr-2" />
-                                              <span>{job.location}</span>
-                                            </div>
-                                            <div className="flex items-center justify-end mt-4">
+
+                                            <div className="flex items-center justify-end pt-2">
                                               <Button
                                                 variant="link"
                                                 className="text-blue-600 hover:text-blue-700"
@@ -767,14 +771,14 @@ export default function JobsPage() {
                                         <div className="flex-1 p-6">
                                           <div className="h-full">
                                             <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
-                                            <div className="relative min-h-[200px]">
+                                            <div className="relative min-h-[200px] max-h-[600px] overflow-y-auto">
                                               {loadingDescriptions[job.url] ? (
                                                 <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
                                                   <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                                                   <p className="text-sm text-gray-500">正在加载岗位描述...</p>
                                                 </div>
                                               ) : job.description ? (
-                                                <div className="animate-fadeIn">
+                                                <div className="animate-fadeIn pr-4">
                                                   {job.description.includes('获取岗位描述失败') ? (
                                                     <div className="flex flex-col items-center justify-center space-y-3">
                                                       <AlertCircle className="w-8 h-8 text-red-500" />
@@ -803,8 +807,8 @@ export default function JobsPage() {
                                                         if (line.match(/^\d+\./)) {
                                                           return (
                                                             <div key={index} className="flex items-start space-x-2">
-                                                              <span className="text-blue-500 font-medium">{line.split('.')[0]}.</span>
-                                                              <p className="text-sm text-gray-700 flex-1">{line.split('.').slice(1).join('.').trim()}</p>
+                                                              <span className="text-blue-500 font-medium min-w-[20px]">{line.split('.')[0]}.</span>
+                                                              <p className="text-sm text-gray-700 flex-1 break-words">{line.split('.').slice(1).join('.').trim()}</p>
                                                             </div>
                                                           );
                                                         }
@@ -812,8 +816,8 @@ export default function JobsPage() {
                                                         if (line.startsWith('- ')) {
                                                           return (
                                                             <div key={index} className="flex items-start space-x-2">
-                                                              <span className="text-blue-500 mt-1.5">•</span>
-                                                              <p className="text-sm text-gray-700 flex-1">{line.substring(2)}</p>
+                                                              <span className="text-blue-500 mt-1.5 min-w-[12px]">•</span>
+                                                              <p className="text-sm text-gray-700 flex-1 break-words">{line.substring(2)}</p>
                                                             </div>
                                                           );
                                                         }
@@ -821,15 +825,15 @@ export default function JobsPage() {
                                                         if (line.startsWith('  - ')) {
                                                           return (
                                                             <div key={index} className="flex items-start space-x-2 ml-4">
-                                                              <span className="text-gray-400 mt-1.5">○</span>
-                                                              <p className="text-sm text-gray-600 flex-1">{line.substring(4)}</p>
+                                                              <span className="text-gray-400 mt-1.5 min-w-[12px]">○</span>
+                                                              <p className="text-sm text-gray-600 flex-1 break-words">{line.substring(4)}</p>
                                                             </div>
                                                           );
                                                         }
                                                         // 处理普通文本
                                                         if (line.trim()) {
                                                           return (
-                                                            <p key={index} className="text-sm text-gray-700 leading-relaxed">
+                                                            <p key={index} className="text-sm text-gray-700 leading-relaxed break-words">
                                                               {line}
                                                             </p>
                                                           );
@@ -1184,23 +1188,27 @@ export default function JobsPage() {
                         <div className="flex flex-col md:flex-row">
                           {/* 左侧基本信息 */}
                           <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
-                            <div className="flex justify-between items-start mb-4">
-                              <div>
-                                <h3 className="text-xl font-semibold text-gray-900">{job.position}</h3>
-                                <p className="text-base text-gray-600 mt-1">{job.company}</p>
+                            <div className="flex flex-col space-y-4">
+                              <div className="flex flex-col space-y-2">
+                                <h3 className="text-xl font-semibold text-gray-900 break-words line-clamp-2 hover:line-clamp-none">{job.position}</h3>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-base text-gray-600 break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                  <span className="text-lg font-bold text-blue-600 whitespace-nowrap ml-2">{job.salary}</span>
+                                </div>
                               </div>
-                              <span className="text-lg font-bold text-blue-600">{job.salary}</span>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="flex items-center text-gray-600">
-                                <Building2 className="w-4 h-4 mr-2" />
-                                <span>{job.company}</span>
+                              
+                              <div className="space-y-3 pt-2">
+                                <div className="flex items-center text-gray-600">
+                                  <Building2 className="w-4 h-4 min-w-[16px] mr-2" />
+                                  <span className="break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                </div>
+                                <div className="flex items-center text-gray-600">
+                                  <MapPin className="w-4 h-4 min-w-[16px] mr-2" />
+                                  <span className="break-words line-clamp-1 hover:line-clamp-none">{job.location}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center text-gray-600">
-                                <MapPin className="w-4 h-4 mr-2" />
-                                <span>{job.location}</span>
-                              </div>
-                              <div className="flex items-center justify-end mt-4">
+
+                              <div className="flex items-center justify-end pt-2">
                                 <Button
                                   variant="link"
                                   className="text-blue-600 hover:text-blue-700"
@@ -1217,14 +1225,14 @@ export default function JobsPage() {
                           <div className="flex-1 p-6">
                             <div className="h-full">
                               <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
-                              <div className="relative min-h-[200px]">
+                              <div className="relative min-h-[200px] max-h-[600px] overflow-y-auto">
                                 {loadingDescriptions[job.url] ? (
                                   <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
                                     <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                                     <p className="text-sm text-gray-500">正在加载岗位描述...</p>
                                   </div>
                                 ) : job.description ? (
-                                  <div className="animate-fadeIn">
+                                  <div className="animate-fadeIn pr-4">
                                     {job.description.includes('获取岗位描述失败') ? (
                                       <div className="flex flex-col items-center justify-center space-y-3">
                                         <AlertCircle className="w-8 h-8 text-red-500" />
@@ -1253,8 +1261,8 @@ export default function JobsPage() {
                                           if (line.match(/^\d+\./)) {
                                             return (
                                               <div key={index} className="flex items-start space-x-2">
-                                                <span className="text-blue-500 font-medium">{line.split('.')[0]}.</span>
-                                                <p className="text-sm text-gray-700 flex-1">{line.split('.').slice(1).join('.').trim()}</p>
+                                                <span className="text-blue-500 font-medium min-w-[20px]">{line.split('.')[0]}.</span>
+                                                <p className="text-sm text-gray-700 flex-1 break-words">{line.split('.').slice(1).join('.').trim()}</p>
                                               </div>
                                             );
                                           }
@@ -1262,8 +1270,8 @@ export default function JobsPage() {
                                           if (line.startsWith('- ')) {
                                             return (
                                               <div key={index} className="flex items-start space-x-2">
-                                                <span className="text-blue-500 mt-1.5">•</span>
-                                                <p className="text-sm text-gray-700 flex-1">{line.substring(2)}</p>
+                                                <span className="text-blue-500 mt-1.5 min-w-[12px]">•</span>
+                                                <p className="text-sm text-gray-700 flex-1 break-words">{line.substring(2)}</p>
                                               </div>
                                             );
                                           }
@@ -1271,15 +1279,15 @@ export default function JobsPage() {
                                           if (line.startsWith('  - ')) {
                                             return (
                                               <div key={index} className="flex items-start space-x-2 ml-4">
-                                                <span className="text-gray-400 mt-1.5">○</span>
-                                                <p className="text-sm text-gray-600 flex-1">{line.substring(4)}</p>
+                                                <span className="text-gray-400 mt-1.5 min-w-[12px]">○</span>
+                                                <p className="text-sm text-gray-600 flex-1 break-words">{line.substring(4)}</p>
                                               </div>
                                             );
                                           }
                                           // 处理普通文本
                                           if (line.trim()) {
                                             return (
-                                              <p key={index} className="text-sm text-gray-700 leading-relaxed">
+                                              <p key={index} className="text-sm text-gray-700 leading-relaxed break-words">
                                                 {line}
                                               </p>
                                             );

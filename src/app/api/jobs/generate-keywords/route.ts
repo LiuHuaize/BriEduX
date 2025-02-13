@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { OpenAI } from 'openai';
 
 const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_SINGLE_API_KEY || '',
-  baseURL: 'https://www.gptapi.us/v1'
+  apiKey: process.env.VOLC_API_KEY || '0deb2718-7709-451c-8af3-53c737babead',
+  baseURL: 'https://ark.cn-beijing.volces.com/api/v3'
 });
 
 const SYSTEM_PROMPT = `你是一个专业的职业规划顾问。请分析简历内容，生成2个最匹配的职位关键词，按照与简历内容的相关度从高到低排序。
@@ -11,8 +11,8 @@ const SYSTEM_PROMPT = `你是一个专业的职业规划顾问。请分析简历
 要求：
 1. 关键词要简洁通用，例如"AI产品经理"、"全栈工程师"
 2. 第一个关键词应该是最具体且最匹配的职位
-3. 第二个关键词可以是第二匹配的职位，但也不要太宽泛，尽量不要是包含关系，比如ai产品经理和产品经理
-4. 每个关键词控制在2-6个字
+3. 第二个关键词可以是第二具体匹配的职位，但也不要太宽泛，尽量不要是包含关系，不要像ai产品经理和产品经理这样
+4. 每个关键词控制在4-10个字
 5. 使用常见的职位名称
 6. 优先考虑简历中提到的技术栈和领域经验
 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     console.log('收到简历文本:', resumeText.substring(0, 100) + '...');
     
     const completion = await client.chat.completions.create({
-      model: 'deepseek-v3',
+      model: 'ep-20250213235903-c2gxm',
       messages: [
         {
           role: "system",
@@ -42,13 +42,23 @@ export async function POST(request: Request) {
       response_format: { type: "json_object" }
     });
 
-    const result = completion.choices[0].message.content;
-    console.log('AI 原始响应:', result);
+    const result = completion.choices[0]?.message?.content;
+    
+    if (!result) {
+      throw new Error('No response content from API');
+    }
 
     try {
-      // 清理响应文本，移除可能的 Markdown 代码块标记
-      const cleanResult = result.replace(/```json\n|\n```/g, '').trim();
-      const parsed = JSON.parse(cleanResult);
+      // 清理响应文本，移除所有可能的格式标记
+      const cleanResult = result
+        .replace(/```json\n?/g, '')
+        .replace(/\n```/g, '')
+        .replace(/^json\n?/i, '')
+        .trim();
+      
+      console.log('清理后的结果:', cleanResult);
+      
+      const parsed = JSON.parse(cleanResult) as { keywords?: string[] };
       console.log('解析后的JSON:', parsed);
       
       if (!parsed.keywords) {
@@ -72,10 +82,11 @@ export async function POST(request: Request) {
       });
     } catch (parseError) {
       console.error('JSON解析错误:', parseError);
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
       return NextResponse.json(
         { 
           error: '生成失败', 
-          details: `解析错误: ${parseError.message}`
+          details: `解析错误: ${errorMessage}`
         },
         { status: 500 }
       );
