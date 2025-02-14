@@ -2,6 +2,8 @@
 
 import { useRef, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   Send, 
   Mic, 
@@ -13,7 +15,8 @@ import {
   CheckCircle2,
   CheckCircle,
   Circle,
-  ArrowLeft
+  ArrowLeft,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChat } from 'ai/react';
@@ -94,7 +97,7 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 第3步 - 教育背景：
 - 询问教育经历 可以使用更详细的例子，引导用户提供完整的信息。提示词可以调整为：
 "请描述您的教育经历，例子：
-'2015-2019，我在北京大学软件工程专业（本科）就读，gpa3.8，还曾获得国家奖学金与校内优秀学生称号。'
+'2015-2019，我在北京大学软件工程专业（本科）就读，gpa3.8，还曾获得国家奖学金'
 这里请包含就读学校、专业、起止年份、以及您觉得值得标注的荣誉或奖项。"
 这样不仅让例子更生动，也能帮助系统提取出起止时间、学校名称、专业详情及额外成就。
 
@@ -161,7 +164,6 @@ const SYSTEM_PROMPT = `你是一个专业的简历顾问，帮助用户创建简
 - 如果用户表示没有某类经历，给予理解并平稳过渡到下一步
 
 5. 语言风格：
-- 举例是不要用格式要
 - 给予积极的反馈
 - 在询问更多经历时保持友好和开放的态度
 
@@ -212,6 +214,7 @@ const CreateResume = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isMounted = useRef(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   // 在组件卸载时更新挂载状态
   useEffect(() => {
@@ -533,13 +536,19 @@ const CreateResume = () => {
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const trimmedInput = input.trim();
+    if (!trimmedInput || isLoading) return;
 
     if (isMounted.current) {
       setShowThinking(true);
     }
     
     try {
+      // 立即清空输入框
+      handleInputChange({ target: { value: '' } } as React.ChangeEvent<HTMLTextAreaElement>);
+      
+      // 使用保存的输入内容进行提交
+      const message = { content: trimmedInput, role: 'user' };
       await handleChatSubmit(e);
     } catch (error) {
       console.error('Error submitting chat:', error);
@@ -555,6 +564,19 @@ const CreateResume = () => {
       setShowCompletionMessage(true);
     }
   };
+
+  // 在组件顶部添加加载状态
+  useEffect(() => {
+    // 模拟页面加载
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 修改现有的 isLoading 判断
+  const showLoading = isLoading;
 
   return (
     <div className="fixed inset-0 flex bg-gradient-to-br from-gray-100 via-white to-gray-100">
@@ -572,15 +594,18 @@ const CreateResume = () => {
       <div className="w-[280px] border-r border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">历史简历</h3>
-          <div className="space-y-3">
-            {/* 这里可以添加历史记录列表项 */}
-            <div className="p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-all duration-200">
-              <div className="text-sm font-medium text-gray-800">前端开发工程师简历</div>
-              <div className="text-xs text-gray-500 mt-1">最后编辑于 2024-01-20</div>
-            </div>
-            <div className="p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-all duration-200">
-              <div className="text-sm font-medium text-gray-800">产品经理简历</div>
-              <div className="text-xs text-gray-500 mt-1">最后编辑于 2024-01-19</div>
+          <div className="space-y-4">
+            <div className="relative overflow-hidden rounded-2xl border border-gray-200/60 bg-gray-50/50 p-4">
+              <div className="relative z-10">
+                <div className="text-sm font-medium text-gray-400 mb-2">功能开发中</div>
+                <div className="text-xs text-gray-400">聊天记录保存功能即将上线，敬请期待！</div>
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 to-white/90 backdrop-blur-sm" />
+              <div className="absolute bottom-0 right-0 transform translate-x-2 translate-y-2">
+                <div className="text-gray-200">
+                  <Clock className="w-12 h-12 opacity-20" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -593,7 +618,11 @@ const CreateResume = () => {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-blue-700" />
+                {showLoading ? (
+                  <Loader2 className="w-5 h-5 text-blue-700 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-5 h-5 text-blue-700" />
+                )}
               </div>
               <span className="font-medium text-gray-800">
                 {currentStep === RESUME_STEPS.INIT && '开始创建简历'}
@@ -628,25 +657,30 @@ const CreateResume = () => {
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}
                   >
                     <div className={`flex items-start gap-3 max-w-[85%] ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md ${
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${
                         message.role === 'user' 
-                          ? 'bg-gradient-to-br from-blue-600 to-blue-700' 
-                          : 'bg-gradient-to-br from-gray-700 to-gray-800'
+                          ? 'bg-gradient-to-br from-gray-800 to-gray-900 ring-4 ring-gray-50' 
+                          : 'bg-gradient-to-br from-gray-800 to-gray-900 ring-4 ring-gray-50'
                       }`}>
                         {message.role === 'user' ? 
-                          <User className="w-5 h-5 text-white" /> : 
-                          <Bot className="w-5 h-5 text-white" />
+                          <User className="w-5 h-5 text-white/90" /> : 
+                          <Bot className="w-5 h-5 text-white/90" />
                         }
                       </div>
                       <div className={`flex flex-col gap-2 min-w-0 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                        <div className={`rounded-2xl px-6 py-4 max-w-full break-words shadow-md ${
+                        <div className={`rounded-2xl px-6 py-4 max-w-full break-words shadow-sm transition-all duration-200 ${
                           message.role === 'user' 
-                            ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white' 
-                            : 'bg-white border border-gray-200 text-gray-800'
+                            ? 'bg-gray-900 text-white/90 hover:shadow-md hover:shadow-gray-100' 
+                            : 'bg-white hover:bg-gray-50/50 border border-gray-200 text-gray-700 hover:shadow-md hover:shadow-gray-100'
                         }`}>
-                          <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            className="text-[15px] leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert"
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
-                        <span className="text-xs text-gray-500 px-1">
+                        <span className="text-xs text-gray-400 px-1">
                           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -656,27 +690,38 @@ const CreateResume = () => {
               ))}
 
               {/* AI 思考中的加载状态 */}
-              {showThinking && isLoading && (
+              {showThinking && showLoading && (
                 <motion.div
+                  key="thinking"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   className="flex justify-start mb-6"
                 >
                   <div className="flex items-start gap-3 max-w-[85%]">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md bg-gradient-to-br from-gray-700 to-gray-800">
-                      <Bot className="w-5 h-5 text-white" />
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm bg-gradient-to-br from-gray-800 to-gray-900 ring-4 ring-gray-50">
+                      <Bot className="w-5 h-5 text-white/90" />
                     </div>
                     <div className="flex flex-col gap-2 min-w-0">
-                      <div className="rounded-2xl px-6 py-4 bg-white border border-gray-200 shadow-md">
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse delay-150" />
-                          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse delay-300" />
-                          <span className="text-[15px] text-gray-500">AI 正在深度思考...</span>
+                      <div className="rounded-2xl px-6 py-4 bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <div className="flex items-center gap-1">
+                              <div className="w-3 h-3 rounded-full bg-blue-500/20">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[pulse_1.5s_ease-in-out_infinite]" />
+                              </div>
+                              <div className="w-3 h-3 rounded-full bg-blue-500/20">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[pulse_1.5s_ease-in-out_infinite_0.3s]" />
+                              </div>
+                              <div className="w-3 h-3 rounded-full bg-blue-500/20">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-[pulse_1.5s_ease-in-out_infinite_0.6s]" />
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-[15px] text-gray-500 font-medium">AI 正在思考...</span>
                         </div>
                       </div>
-                      <span className="text-xs text-gray-500 px-1">
+                      <span className="text-xs text-gray-400 px-1">
                         {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
@@ -694,7 +739,7 @@ const CreateResume = () => {
       <div className="w-[280px] border-l border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="p-6 space-y-6">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-1 bg-gradient-to-b from-blue-600 to-blue-700 rounded-full" />
+            <div className="h-8 w-1 bg-gradient-to-b from-gray-800 to-gray-900 rounded-full" />
             <h3 className="text-lg font-semibold text-gray-900">简历创建进度</h3>
           </div>
           <div className="space-y-3">
@@ -805,41 +850,49 @@ const CreateResume = () => {
                 onChange={handleInputChange}
                 placeholder="输入消息..."
                 rows={1}
-                className="w-full resize-none rounded-xl bg-transparent px-3 py-2 text-[15px] text-gray-700 placeholder:text-gray-400 focus:outline-none"
+                className="w-full resize-none rounded-2xl bg-white/80 backdrop-blur-sm px-4 py-3 text-[15px] text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900/10 pr-24 border border-gray-200/80 shadow-sm transition-all duration-200"
                 style={{
-                  minHeight: '36px',
+                  minHeight: '48px',
                   maxHeight: '120px'
                 }}
+                onCompositionStart={() => {
+                  (window as any).isComposing = true;
+                }}
+                onCompositionEnd={() => {
+                  (window as any).isComposing = false;
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.stopPropagation();
+                  if (e.key === 'Enter' && !e.shiftKey && !(window as any).isComposing) {
+                    e.preventDefault();
+                    if (input.trim() && !showLoading) {
+                      handleSubmit(e);
+                    }
                   }
                 }}
               />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                {showLoading ? (
+                  <div className="flex items-center gap-1 px-3 py-1.5">
+                    <div className="relative w-5 h-5">
+                      <div className="absolute inset-0 rounded-full border-2 border-gray-900/10 border-t-gray-900 animate-spin" />
+                    </div>
+                  </div>
+                ) : (
+                  <div 
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-white shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (input.trim() && !showLoading) {
+                        handleSubmit(e);
+                      }
+                    }}
+                  >
+                    <Send className="w-4 h-4 text-white/90 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    <span className="text-sm font-medium">发送</span>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* 发送按钮 */}
-            <Button
-              type="submit"
-              disabled={isLoading || !input.trim()}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
-                isLoading || !input.trim()
-                  ? 'bg-gray-100/80 text-gray-400'
-                  : 'bg-gradient-to-br from-indigo-500 via-blue-500 to-cyan-400 hover:from-indigo-600 hover:via-blue-600 hover:to-cyan-500 text-white shadow-[0_4px_12px_-2px_rgba(79,70,229,0.4)] hover:shadow-[0_8px_20px_-2px_rgba(79,70,229,0.5)] scale-100 hover:scale-105'
-              }`}
-              onClick={(e) => {
-                e.preventDefault();
-                if (input.trim() && !isLoading) {
-                  handleSubmit(e);
-                }
-              }}
-            >
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </Button>
           </div>
         </form>
       </div>
