@@ -55,6 +55,7 @@ const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任
 6. 特别注意从文本中的Markdown链接格式（[链接标题](URL)）中提取URL
 7. 确保每个职位的URL与对应的职位信息完全匹配
 8. 如果找不到对应的URL，将url字段设置为空字符串
+9. 对于工作地点，保留完整的地址信息，包括省市区等详细信息
 
 输出格式示例：
 {
@@ -62,7 +63,7 @@ const PARSE_SYSTEM_PROMPT = `你是一个专业的数据解析助手。你的任
     {
       "company": "公司名称",
       "position": "职位名称",
-      "location": "工作地点",
+      "location": "工作地点（完整地址）",
       "salary": "薪资范围",
       "url": "职位链接"
     }
@@ -178,7 +179,7 @@ export async function POST(request: Request) {
     const cozeData = await callCozeAPI(body.query);
     console.log('Coze API 返回数据:', cozeData);
     
-    // 调用 Deepseek API 解析数据
+    // 调用 Deepseek API 解析数据，添加地址处理的提示
     const content = await callDeepseekAPI(cozeData.data);
     if (!content) {
       throw new Error('Deepseek API 返回内容为空');
@@ -195,14 +196,20 @@ export async function POST(request: Request) {
       throw new Error(`JSON解析失败: ${error instanceof Error ? error.message : String(error)}`);
     }
     
-    // 验证数据结构
+    // 验证数据结构并确保地址信息完整
     if (!jobListings.jobs || !Array.isArray(jobListings.jobs)) {
       throw new Error('解析结果格式不正确');
     }
 
+    // 处理并标准化地址信息
+    const processedJobs = jobListings.jobs.map((job: JobInfo) => ({
+      ...job,
+      location: job.location || '地址未提供'  // 确保地址字段有值
+    }));
+
     return NextResponse.json({
       success: true,
-      data: jobListings.jobs,
+      data: processedJobs,
       output: cozeData.data,
       debug_url: cozeData.debug_url
     });

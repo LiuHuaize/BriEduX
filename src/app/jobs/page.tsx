@@ -122,6 +122,8 @@ export default function JobsPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [location, setLocation] = useState("");
+  const [additionalInfo, setAdditionalInfo] = useState("");
   const [filters, setFilters] = useState<JobFilter>({
     location: "",
     position: "",
@@ -154,11 +156,14 @@ export default function JobsPage() {
 
   // 添加日志
   const addLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
-    setUploadLogs(prev => [...prev, {
-      time: new Date(),
-      message,
-      type
-    }]);
+    // 只记录错误信息
+    if (type === 'error') {
+      setUploadLogs(prev => [...prev, {
+        time: new Date(),
+        message,
+        type
+      }]);
+    }
   };
 
   // 处理文件拖拽
@@ -205,15 +210,12 @@ export default function JobsPage() {
       const fileName = `${uuidv4()}.${fileExt}`;
       const filePath = `resume/${fileName}`;
 
-      // 开始处理进度提示
-      addLog('开始处理简历文件...', 'info');
       setUploadProgress(20);
 
       let extractedText = '';
       
       // 根据文件类型调用不同的处理API
       if (fileType === 'pdf') {
-        // 首先通过API上传文件
         console.log('正在上传PDF文件...');
         const formData = new FormData();
         formData.append('file', file);
@@ -231,7 +233,6 @@ export default function JobsPage() {
         }
 
         setUploadProgress(40);
-        console.log('PDF文件上传成功，开始转换...');
 
         // 处理PDF文件
         const response = await fetch('/api/convert_pdf', {
@@ -251,7 +252,6 @@ export default function JobsPage() {
         extractedText = result.markdown;
         
       } else if (fileType === 'doc' || fileType === 'docx') {
-        // 处理Word文件
         console.log('开始处理Word文件...');
         const formData = new FormData();
         formData.append('file', file);
@@ -269,7 +269,6 @@ export default function JobsPage() {
         const result = await response.json();
         extractedText = result.text;
 
-        // Word文件处理成功后，上传到存储
         console.log('Word文件处理成功，开始上传...');
         const uploadFormData = new FormData();
         uploadFormData.append('file', file);
@@ -282,15 +281,11 @@ export default function JobsPage() {
 
         if (!uploadResponse.ok) {
           console.warn('文件存储失败，但内容已提取');
-          addLog('文件存储失败，但内容已提取', 'warning');
         }
         
       } else if (fileType === 'txt') {
-        // 直接读取txt文件内容
-        console.log('开始读取文本文件...');
         extractedText = await file.text();
 
-        // 文本文件处理成功后，上传到存储
         console.log('文本文件读取成功，开始上传...');
         const uploadFormData = new FormData();
         uploadFormData.append('file', file);
@@ -303,31 +298,20 @@ export default function JobsPage() {
 
         if (!uploadResponse.ok) {
           console.warn('文件存储失败，但内容已提取');
-          addLog('文件存储失败，但内容已提取', 'warning');
         }
       }
 
-      setUploadProgress(80);
-      addLog('简历内容提取完成', 'success');
-
       setUploadProgress(100);
       setUploadStatus('success');
-      addLog('🎉 简历处理完成！', 'success');
-
-      // 保存提取的文本内容
       setConversionResult(extractedText);
 
-      // 添加自动搜索调用
-      if (extractedText) {
-        handleAutoSearch(extractedText);
-      }
-
-      toast.success(`${file.type === 'text/plain' ? '文本' : file.type.includes('word') ? 'Word' : 'PDF'}文件处理成功！`);
+      toast.success('文件处理成功！');
 
     } catch (error: any) {
       console.error('Upload error:', error);
       setUploadStatus('error');
       setError(error.message || '文件处理失败');
+      addLog(error.message || '文件处理失败', 'error');
       toast.error(error.message || '文件处理失败，请重试');
       setConversionResult(null);
     } finally {
@@ -343,27 +327,32 @@ export default function JobsPage() {
     }
   };
 
-  // 构建搜索查询
+  // 修改搜索查询构建函数
   const buildSearchQuery = () => {
     let query = searchQuery;
-
-    // 如果有筛选条件，将其添加到查询中
-    if (filters.location) {
-      query += ` 工作地点在${filters.location}`;
+    
+    // 添加地址到查询
+    if (location) {
+      query = `${location}，${query}`;
     }
+
+    // 添加额外说明到查询
+    if (additionalInfo) {
+      query += `，${additionalInfo}`;
+    }
+    
     if (filters.position) {
-      query += ` 职位是${filters.position}`;
+      query += ` ${filters.position}`;
     }
     if (filters.minSalary) {
-      query += ` 薪资${filters.minSalary}k以上`;
+      query += ` ${filters.minSalary}以上工资`;
     }
-    if (filters.education) {
-      query += ` 学历要求${educationMap[filters.education]}`;
+    if (filters.education && educationMap[filters.education]) {
+      query += ` ${educationMap[filters.education]}`;
     }
-    if (filters.experience) {
-      query += ` 工作经验${experienceMap[filters.experience]}`;
+    if (filters.experience && experienceMap[filters.experience]) {
+      query += ` ${experienceMap[filters.experience]}`;
     }
-
     return query.trim();
   };
 
@@ -563,7 +552,10 @@ export default function JobsPage() {
       const keywordResponse = await fetch('/api/jobs/generate-keywords', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText })
+        body: JSON.stringify({ 
+          resumeText,
+          location: location // 添加地址信息
+        })
       });
 
       if (!keywordResponse.ok) {
@@ -577,8 +569,11 @@ export default function JobsPage() {
 
       setGeneratedKeywords(keywords);
       
-      // 并行执行两个关键词的搜索
-      keywords.forEach((keyword: string) => handleKeywordSearch(keyword));
+      // 为每个关键词添加地址信息
+      keywords.forEach((keyword: string) => {
+        const searchQuery = location ? `${location}，${keyword}` : keyword;
+        handleKeywordSearch(searchQuery);
+      });
       
     } catch (error) {
       setKeywordError(error instanceof Error ? error.message : '自动搜索失败');
@@ -650,238 +645,140 @@ export default function JobsPage() {
         >
           {activeMethod === 'resume' ? (
             <div className="space-y-8">
-              {/* 上传区域 */}
-              <div
-                {...getRootProps()}
-                className={`relative overflow-hidden bg-white rounded-2xl shadow-lg transition-all duration-300 ${
-                  isDragActive ? 'border-2 border-blue-500 bg-blue-50' : ''
-                } ${!isUploading && 'hover:shadow-xl'}`}
-              >
-                <input {...getInputProps()} onChange={handleResumeUpload} disabled={isUploading} />
-                
-                <div className="p-8">
-                  {isUploading ? (
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-center">
-                        <div className="relative w-24 h-24">
-                          <div className="absolute inset-0 rounded-full border-4 border-blue-100 border-opacity-50"></div>
-                          <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <FileText className="w-8 h-8 text-blue-500" />
+              {/* 上传区域和地址输入的网格布局 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 上传区域 */}
+                <div
+                  {...getRootProps()}
+                  className={`relative overflow-hidden bg-white rounded-2xl shadow-lg transition-all duration-300 ${
+                    isDragActive ? 'border-2 border-blue-500 bg-blue-50' : ''
+                  } ${!isUploading && 'hover:shadow-xl'}`}
+                >
+                  <input {...getInputProps()} onChange={handleResumeUpload} disabled={isUploading} />
+                  
+                  <div className="p-8">
+                    {isUploading ? (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-center">
+                          <div className="relative w-24 h-24">
+                            <div className="absolute inset-0 rounded-full border-4 border-blue-100 border-opacity-50"></div>
+                            <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <FileText className="w-8 h-8 text-blue-500" />
+                            </div>
                           </div>
                         </div>
+                        <div className="space-y-3">
+                          <div className="text-center">
+                            <p className="text-lg font-medium text-gray-900">正在分析您的简历</p>
+                            <p className="text-sm text-gray-500 mt-1">请稍候，这可能需要几秒钟...</p>
+                          </div>
+                          <Progress value={uploadProgress} className="w-full h-1.5" />
+                          <p className="text-center text-sm font-medium text-blue-600">
+                            {uploadProgress < 100 ? '正在处理...' : '分析完成！'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="space-y-3">
-                        <div className="text-center">
-                          <p className="text-lg font-medium text-gray-900">正在分析您的简历</p>
-                          <p className="text-sm text-gray-500 mt-1">请稍候，这可能需要几秒钟...</p>
+                    ) : resumeFile && uploadStatus === 'success' ? (
+                      <div className="text-center space-y-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-50">
+                          <CheckCircle2 className="w-8 h-8 text-green-500" />
                         </div>
-                        <Progress value={uploadProgress} className="w-full h-1.5" />
-                        <p className="text-center text-sm font-medium text-blue-600">
-                          {uploadProgress < 100 ? '正在处理...' : '分析完成！'}
-                        </p>
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">简历上传成功</h3>
+                          <p className="text-sm text-gray-500 mt-1">{resumeFile.name}</p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            className="mt-4 bg-blue-600 text-white hover:bg-blue-700"
+                            onClick={() => {
+                              if (conversionResult) {
+                                handleAutoSearch(conversionResult);
+                              }
+                            }}
+                            disabled={!conversionResult || isGeneratingKeywords}
+                          >
+                            {isGeneratingKeywords ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                正在分析...
+                              </>
+                            ) : (
+                              <>
+                                <Search className="w-4 h-4 mr-2" />
+                                开始分析匹配
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setResumeFile(null);
+                              setUploadStatus('idle');
+                              setUploadProgress(0);
+                              setUploadLogs([]);
+                              setConversionResult(null);
+                            }}
+                          >
+                            重新上传
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ) : resumeFile && uploadStatus === 'success' ? (
-                    <div className="mt-8 space-y-6">
-                      {isGeneratingKeywords && (
-                        <div className="flex items-center justify-center p-6 bg-white rounded-lg shadow-sm">
-                          <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
-                          <span className="text-gray-600">正在分析简历，生成匹配关键词...</span>
+                    ) : (
+                      <div className="text-center space-y-4">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50">
+                          <Upload className="w-8 h-8 text-blue-500" />
                         </div>
-                      )}
-
-                      {keywordError && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertTitle>分析失败</AlertTitle>
-                          <AlertDescription>{keywordError}</AlertDescription>
-                        </Alert>
-                      )}
-
-                      {keywordResults.length > 0 && (
-                        <div className="space-y-8">
-                          {keywordResults.map((result, index) => (
-                            <div key={index} className="space-y-4">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-xl font-semibold text-gray-900">
-                                  匹配方向 {index + 1}：{result.keyword}
-                                </h3>
-                                {result.isLoading ? (
-                                  <div className="flex items-center text-blue-600">
-                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                    <span>搜索中...</span>
-                                  </div>
-                                ) : result.error ? (
-                                  <span className="text-red-500 text-sm">{result.error}</span>
-                                ) : (
-                                  <span className="text-gray-500">
-                                    找到 {result.jobs.length} 个匹配职位
-                                  </span>
-                                )}
-                              </div>
-
-                              {result.error ? (
-                                <Alert variant="destructive">
-                                  <AlertCircle className="h-4 w-4" />
-                                  <AlertTitle>搜索失败</AlertTitle>
-                                  <AlertDescription>{result.error}</AlertDescription>
-                                </Alert>
-                              ) : (
-                                <div className="grid gap-4">
-                                  {result.jobs.map((job, jobIndex) => (
-                                    <Card key={jobIndex} className="hover:shadow-lg transition-shadow duration-300">
-                                      <div className="flex flex-col md:flex-row">
-                                        {/* 左侧基本信息 */}
-                                        <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
-                                          <div className="flex flex-col space-y-4">
-                                            <div className="flex flex-col space-y-2">
-                                              <h3 className="text-xl font-semibold text-gray-900 break-words line-clamp-2 hover:line-clamp-none">{job.position}</h3>
-                                              <div className="flex items-center justify-between">
-                                                <span className="text-base text-gray-600 break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
-                                                <span className="text-lg font-bold text-blue-600 whitespace-nowrap ml-2">{job.salary}</span>
-                                              </div>
-                                            </div>
-                                            
-                                            <div className="space-y-3 pt-2">
-                                              <div className="flex items-center text-gray-600">
-                                                <Building2 className="w-4 h-4 min-w-[16px] mr-2" />
-                                                <span className="break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
-                                              </div>
-                                              <div className="flex items-center text-gray-600">
-                                                <MapPin className="w-4 h-4 min-w-[16px] mr-2" />
-                                                <span className="break-words line-clamp-1 hover:line-clamp-none">{job.location}</span>
-                                              </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-end pt-2">
-                                              <Button
-                                                variant="link"
-                                                className="text-blue-600 hover:text-blue-700"
-                                                onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
-                                              >
-                                                <ExternalLink className="w-4 h-4 mr-1" />
-                                                查看原文
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        {/* 右侧岗位描述 */}
-                                        <div className="flex-1 p-6">
-                                          <div className="h-full">
-                                            <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
-                                            <div className="relative min-h-[200px] max-h-[600px] overflow-y-auto">
-                                              {loadingDescriptions[job.url] ? (
-                                                <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
-                                                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                                                  <p className="text-sm text-gray-500">正在加载岗位描述...</p>
-                                                </div>
-                                              ) : job.description ? (
-                                                <div className="animate-fadeIn pr-4">
-                                                  {job.description.includes('获取岗位描述失败') ? (
-                                                    <div className="flex flex-col items-center justify-center space-y-3">
-                                                      <AlertCircle className="w-8 h-8 text-red-500" />
-                                                      <p className="text-sm text-red-500">{job.description}</p>
-                                                      <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleLoadDescription(job)}
-                                                        className="mt-2"
-                                                      >
-                                                        重试加载
-                                                      </Button>
-                                                    </div>
-                                                  ) : (
-                                                    <div className="space-y-4">
-                                                      {job.description.split('\n').map((line, index) => {
-                                                        // 处理主标题
-                                                        if (line.match(/^(职位概述|岗位职责|任职要求|岗位要求|工作职责|薪资待遇)：?$/)) {
-                                                          return (
-                                                            <h4 key={index} className="text-base font-semibold text-gray-900 mt-4">
-                                                              {line}
-                                                            </h4>
-                                                          );
-                                                        }
-                                                        // 处理数字编号的行
-                                                        if (line.match(/^\d+\./)) {
-                                                          return (
-                                                            <div key={index} className="flex items-start space-x-2">
-                                                              <span className="text-blue-500 font-medium min-w-[20px]">{line.split('.')[0]}.</span>
-                                                              <p className="text-sm text-gray-700 flex-1 break-words">{line.split('.').slice(1).join('.').trim()}</p>
-                                                            </div>
-                                                          );
-                                                        }
-                                                        // 处理标题行
-                                                        if (line.startsWith('- ')) {
-                                                          return (
-                                                            <div key={index} className="flex items-start space-x-2">
-                                                              <span className="text-blue-500 mt-1.5 min-w-[12px]">•</span>
-                                                              <p className="text-sm text-gray-700 flex-1 break-words">{line.substring(2)}</p>
-                                                            </div>
-                                                          );
-                                                        }
-                                                        // 处理子项
-                                                        if (line.startsWith('  - ')) {
-                                                          return (
-                                                            <div key={index} className="flex items-start space-x-2 ml-4">
-                                                              <span className="text-gray-400 mt-1.5 min-w-[12px]">○</span>
-                                                              <p className="text-sm text-gray-600 flex-1 break-words">{line.substring(4)}</p>
-                                                            </div>
-                                                          );
-                                                        }
-                                                        // 处理普通文本
-                                                        if (line.trim()) {
-                                                          return (
-                                                            <p key={index} className="text-sm text-gray-700 leading-relaxed break-words">
-                                                              {line}
-                                                            </p>
-                                                          );
-                                                        }
-                                                        return null;
-                                                      })}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              ) : (
-                                                <div className="flex items-center justify-center h-full text-gray-500">
-                                                  暂无岗位描述
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </Card>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {isDragActive ? "释放以上传简历" : "上传您的简历"}
+                          </h3>
+                          <p className="text-sm text-gray-500 mt-1">
+                            支持 PDF、Word 格式
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  ) : (
+                        {!isDragActive && (
+                          <Button variant="outline" className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
+                            <Upload className="w-4 h-4 mr-2" />
+                            选择文件
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 地址输入区域 */}
+                <div className="bg-white rounded-2xl shadow-lg p-8">
+                  <div className="space-y-6">
                     <div className="text-center space-y-4">
                       <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50">
-                        <Upload className="w-8 h-8 text-blue-500" />
+                        <MapPin className="w-8 h-8 text-blue-500" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-medium text-gray-900">
-                          {isDragActive ? "释放以上传简历" : "上传您的简历"}
-                        </h3>
+                        <h3 className="text-lg font-medium text-gray-900">期望工作地点</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                          支持 PDF、Word 格式
+                          输入您期望的工作城市
                         </p>
                       </div>
-                      {!isDragActive && (
-                        <Button variant="outline" className="mt-4 bg-blue-600 text-white hover:bg-blue-700">
-                          <Upload className="w-4 h-4 mr-2" />
-                          选择文件
-                        </Button>
-                      )}
                     </div>
-                  )}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium text-gray-600">工作地点</Label>
+                        <Input
+                          placeholder="请输入工作地点，如：重庆"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500">
+                          添加地点可以帮助我们为您匹配更精准的职位
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -911,20 +808,238 @@ export default function JobsPage() {
                   </div>
                 </div>
               )}
+
+              {/* 显示上传状态和进度 */}
+              {uploadStatus !== 'idle' && (
+                <div className="space-y-4">
+                  <Progress value={uploadProgress} className="w-full" />
+                  {/* 只在出错时显示错误信息 */}
+                  {uploadLogs.map((log, index) => (
+                    log.type === 'error' && (
+                      <Alert key={index} variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{log.message}</AlertDescription>
+                      </Alert>
+                    )
+                  ))}
+                </div>
+              )}
+
+              {/* 显示分析结果 */}
+              {isGeneratingKeywords && (
+                <div className="mt-8">
+                  <div className="flex items-center justify-center p-6 bg-white rounded-lg shadow-sm">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-3" />
+                    <span className="text-gray-600">正在分析简历，生成匹配关键词...</span>
+                  </div>
+                </div>
+              )}
+
+              {keywordError && (
+                <Alert variant="destructive" className="mt-8">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>分析失败</AlertTitle>
+                  <AlertDescription>{keywordError}</AlertDescription>
+                </Alert>
+              )}
+
+              {keywordResults.length > 0 && (
+                <div className="mt-8 space-y-8">
+                  {keywordResults.map((result, index) => (
+                    <div key={index} className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          匹配方向 {index + 1}：{result.keyword}
+                        </h3>
+                        {result.isLoading ? (
+                          <div className="flex items-center text-blue-600">
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            <span>搜索中...</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500">
+                            找到 {result.jobs.length} 个匹配职位
+                          </span>
+                        )}
+                      </div>
+
+                      {result.error ? (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>搜索失败</AlertTitle>
+                          <AlertDescription>{result.error}</AlertDescription>
+                        </Alert>
+                      ) : (
+                        <div className="grid gap-4">
+                          {result.jobs.map((job, jobIndex) => (
+                            <Card key={jobIndex} className="hover:shadow-lg transition-shadow duration-300">
+                              <div className="flex flex-col md:flex-row">
+                                {/* 左侧基本信息 */}
+                                <div className="flex-1 p-6 border-b md:border-b-0 md:border-r border-gray-100">
+                                  <div className="flex flex-col space-y-4">
+                                    <div className="flex flex-col space-y-2">
+                                      <h3 className="text-xl font-semibold text-gray-900 break-words line-clamp-2 hover:line-clamp-none">{job.position}</h3>
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-base text-gray-600 break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                        <span className="text-lg font-bold text-blue-600 whitespace-nowrap ml-2">{job.salary}</span>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="space-y-3 pt-2">
+                                      <div className="flex items-center text-gray-600">
+                                        <Building2 className="w-4 h-4 min-w-[16px] mr-2" />
+                                        <span className="break-words line-clamp-1 hover:line-clamp-none">{job.company}</span>
+                                      </div>
+                                      <div className="flex items-center text-gray-600">
+                                        <MapPin className="w-4 h-4 min-w-[16px] mr-2" />
+                                        <span className="break-words line-clamp-1 hover:line-clamp-none">{job.location}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-end pt-2">
+                                      <Button
+                                        variant="link"
+                                        className="text-blue-600 hover:text-blue-700"
+                                        onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
+                                      >
+                                        <ExternalLink className="w-4 h-4 mr-1" />
+                                        查看原文
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 右侧岗位描述 */}
+                                <div className="flex-1 p-6">
+                                  <div className="h-full">
+                                    <h4 className="font-medium text-gray-900 mb-4">岗位描述</h4>
+                                    <div className="relative min-h-[200px] max-h-[600px] overflow-y-auto">
+                                      {loadingDescriptions[job.url] ? (
+                                        <div className="flex flex-col items-center justify-center space-y-3 absolute inset-0">
+                                          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                          <p className="text-sm text-gray-500">正在加载岗位描述...</p>
+                                        </div>
+                                      ) : job.description ? (
+                                        <div className="animate-fadeIn pr-4">
+                                          {job.description.includes('获取岗位描述失败') ? (
+                                            <div className="flex flex-col items-center justify-center space-y-3">
+                                              <AlertCircle className="w-8 h-8 text-red-500" />
+                                              <p className="text-sm text-red-500">{job.description}</p>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleLoadDescription(job)}
+                                                className="mt-2"
+                                              >
+                                                重试加载
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-4">
+                                              {job.description.split('\n').map((line, index) => {
+                                                // 处理主标题
+                                                if (line.match(/^(职位概述|岗位职责|任职要求|岗位要求|工作职责|薪资待遇)：?$/)) {
+                                                  return (
+                                                    <h4 key={index} className="text-base font-semibold text-gray-900 mt-4">
+                                                      {line}
+                                                    </h4>
+                                                  );
+                                                }
+                                                // 处理数字编号的行
+                                                if (line.match(/^\d+\./)) {
+                                                  return (
+                                                    <div key={index} className="flex items-start space-x-2">
+                                                      <span className="text-blue-500 font-medium min-w-[20px]">{line.split('.')[0]}.</span>
+                                                      <p className="text-sm text-gray-700 flex-1 break-words">{line.split('.').slice(1).join('.').trim()}</p>
+                                                    </div>
+                                                  );
+                                                }
+                                                // 处理标题行
+                                                if (line.startsWith('- ')) {
+                                                  return (
+                                                    <div key={index} className="flex items-start space-x-2">
+                                                      <span className="text-blue-500 mt-1.5 min-w-[12px]">•</span>
+                                                      <p className="text-sm text-gray-700 flex-1 break-words">{line.substring(2)}</p>
+                                                    </div>
+                                                  );
+                                                }
+                                                // 处理子项
+                                                if (line.startsWith('  - ')) {
+                                                  return (
+                                                    <div key={index} className="flex items-start space-x-2 ml-4">
+                                                      <span className="text-gray-400 mt-1.5 min-w-[12px]">○</span>
+                                                      <p className="text-sm text-gray-600 flex-1 break-words">{line.substring(4)}</p>
+                                                    </div>
+                                                  );
+                                                }
+                                                // 处理普通文本
+                                                if (line.trim()) {
+                                                  return (
+                                                    <p key={index} className="text-sm text-gray-700 leading-relaxed break-words">
+                                                      {line}
+                                                    </p>
+                                                  );
+                                                }
+                                                return null;
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-center h-full text-gray-500">
+                                          暂无岗位描述
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             // 自定义搜索区域
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-xl p-8 hover:shadow-2xl transition-shadow duration-300">
                 <div className="space-y-6">
+                  {/* 添加地址和搜索输入区域 */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">工作地点</Label>
+                      <Input
+                        placeholder="请输入工作地点，如：重庆"
+                        value={location}
+                        onChange={(e) => setLocation(e.target.value)}
+                        className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-600">职位关键词</Label>
+                      <Input
+                        placeholder="请输入职位关键词，如：律师"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                      />
+                    </div>
+                  </div>
+
                   <div className="relative">
+                    <Label className="text-sm font-medium text-gray-600 mb-2 block">补充说明（可选）</Label>
                     <textarea
-                      placeholder="例如：我想要在重庆找一份律师的工作，我是本科然后想要一份6000以上的工作"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="可以补充更多要求，例如：我想要一份6000以上的工作，我是本科学历..."
+                      value={additionalInfo}
+                      onChange={(e) => setAdditionalInfo(e.target.value)}
                       className="w-full h-32 px-4 py-3 text-base text-gray-900 resize-none rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                     />
                   </div>
+
                   <div className="flex items-center justify-between">
                     <Sheet>
                       <SheetTrigger asChild>
@@ -958,8 +1073,8 @@ export default function JobsPage() {
                                 <Label className="text-sm font-medium text-gray-600">工作地点</Label>
                                 <Input
                                   placeholder="例如：重庆"
-                                  value={filters.location || ""}
-                                  onChange={(e) => setFilters({...filters, location: e.target.value})}
+                                  value={location}
+                                  onChange={(e) => setLocation(e.target.value)}
                                   className="h-11 bg-gray-50 border-0 hover:bg-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
                                 />
                               </div>
@@ -1148,16 +1263,13 @@ export default function JobsPage() {
                         清除薪资筛选
                       </Button>
                     )}
-                    {filters.location && (
+                    {location && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="text-blue-600 border-blue-200 hover:bg-blue-50"
                         onClick={() => {
-                          setFilters(prev => ({
-                            ...prev,
-                            location: ""
-                          }));
+                          setLocation("");
                           handleSearch();
                         }}
                       >
@@ -1315,10 +1427,10 @@ export default function JobsPage() {
               {/* 在搜索框下方添加当前筛选条件提示 */}
               {Object.values(filters).some(value => value !== undefined && value !== "" && value !== null) && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {filters.location && (
+                  {location && (
                     <div className="inline-flex items-center px-3 py-1.5 rounded-full bg-gray-50 text-gray-700 text-sm border border-gray-200 hover:bg-gray-100 transition-colors">
                       <span className="mr-2">地点:</span>
-                      <span className="font-medium">{filters.location}</span>
+                      <span className="font-medium">{location}</span>
                     </div>
                   )}
                   {filters.position && (
