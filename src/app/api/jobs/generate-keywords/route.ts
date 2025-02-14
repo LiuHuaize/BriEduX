@@ -10,9 +10,10 @@ const SYSTEM_PROMPT = `你是一个专业的职业规划顾问。请分析简历
 
 要求：
 1. 关键词要简洁通用，例如"AI产品经理"、"全栈工程师"
-2. 每个关键词控制在4-10个字
+2. 每个关键词控制在4-8个字
 3. 使用常见的职位名称
-4. 优先考虑简历中提到的技术栈和领域经验，不要太空泛了，不要是“产品经理”、“工程师”这种
+4. 优先考虑简历中提到的技术栈和领域经验，不要太空泛了，不要是“技术经理”、“负责人”这种
+
 
 请严格按照以下JSON格式返回：
 {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
           content: `请分析以下简历内容，生成两个简洁的职位关键词：\n\n${resumeText.substring(0, 3000)}`
         }
       ],
-      temperature: 0.5,
+      temperature: 0.6,
       response_format: { type: "json_object" }
     });
 
