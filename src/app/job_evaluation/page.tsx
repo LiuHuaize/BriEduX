@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UploadCloud, LineChart, ArrowRight, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { UploadCloud, LineChart, ArrowRight, CheckCircle2, AlertCircle, X, CheckCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from "sonner";
@@ -17,6 +17,14 @@ interface EvaluationResult {
 interface CombinedEvaluationResult {
   resumeEvaluation: EvaluationResult | null;
   jobEvaluation: EvaluationResult | null;
+}
+
+// 添加分析步骤的类型定义
+interface AnalysisStep {
+  id: string;
+  title: string;
+  description: string;
+  status: 'waiting' | 'loading' | 'completed' | 'error';
 }
 
 const JobEvaluation = () => {
@@ -36,6 +44,43 @@ const JobEvaluation = () => {
   const [conversionResult, setConversionResult] = useState<string | null>(null);
   const [conversionLoading, setConversionLoading] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
+
+  // 添加分析步骤状态
+  const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>([
+    {
+      id: 'extract',
+      title: '提取简历内容',
+      description: '正在解析简历文本...',
+      status: 'waiting'
+    },
+    {
+      id: 'analyze',
+      title: '分析简历结构',
+      description: '正在分析简历各个部分...',
+      status: 'waiting'
+    },
+    {
+      id: 'match',
+      title: '岗位匹配度',
+      description: '正在计算与目标岗位的匹配程度...',
+      status: 'waiting'
+    },
+    {
+      id: 'generate',
+      title: '生成评估报告',
+      description: '正在生成详细的评估报告...',
+      status: 'waiting'
+    }
+  ]);
+
+  // 更新步骤状态的辅助函数
+  const updateStepStatus = (stepId: string, status: AnalysisStep['status']) => {
+    setAnalysisSteps(steps => 
+      steps.map(step => 
+        step.id === stepId ? { ...step, status } : step
+      )
+    );
+  };
 
   const handleConvertPDF = async () => {
     if (!filePath) {
@@ -197,12 +242,24 @@ const JobEvaluation = () => {
             throw new Error(pdfData.error);
           }
           
+          // 添加更详细的验证
+          if (!pdfData.markdown) {
+            console.error('PDF转换结果:', pdfData);
+            throw new Error('PDF转换结果为空');
+          }
+          
           resumeContent = pdfData.markdown;
         }
 
         // 验证和格式化最终内容
-        if (!resumeContent || typeof resumeContent !== 'string') {
+        if (!resumeContent) {
+          console.error('简历内容为空');
           throw new Error('文件内容获取失败');
+        }
+
+        if (typeof resumeContent !== 'string') {
+          console.error('简历内容类型:', typeof resumeContent);
+          throw new Error('文件内容格式错误');
         }
 
         // 格式化内容
@@ -235,11 +292,16 @@ const JobEvaluation = () => {
     }
   };
 
+  // 添加延迟函数
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-    console.log('开始提交评估请求...');
+    
+    // 重置所有步骤状态
+    setAnalysisSteps(steps => steps.map(step => ({ ...step, status: 'waiting' })));
 
     try {
       if (!resumeFile) {
@@ -250,35 +312,54 @@ const JobEvaluation = () => {
         throw new Error('简历内容获取失败');
       }
 
-      // 格式化简历内容，确保文本格式正确
+      // 更新第一步状态
+      updateStepStatus('extract', 'loading');
+      await delay(800); // 添加延迟以展示加载动画
+      
+      // 格式化简历内容
       const formattedContent = conversionResult
-        .replace(/\r\n/g, '\n')  // 统一换行符
-        .replace(/\n{3,}/g, '\n\n')  // 将多个连续空行减少为最多两个
-        .trim();  // 去除首尾空白
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
 
-      console.log('简历内容长度:', formattedContent.length);
-      console.log('简历内容预览:', formattedContent.substring(0, 200) + '...');
+      // 第一步完成
+      updateStepStatus('extract', 'completed');
+      await delay(400); // 添加延迟以展示完成状态
+      
+      // 更新第二步状态
+      updateStepStatus('analyze', 'loading');
+      await delay(800);
 
-      // 同时发起两个评估请求
-      const [resumeEvalResponse, jobEvalResponse] = await Promise.all([
-        // 简历评估
-        fetch('/api/resume_evaluation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            resumeContent: formattedContent 
-          }),
+      // 启动简历评估请求
+      const resumeEvalPromise = fetch('/api/resume_evaluation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeContent: formattedContent }),
+      });
+
+      // 如果有岗位描述，启动岗位匹配评估请求
+      const jobEvalPromise = jobDescription ? fetch('/api/job_evaluation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          resumeContent: formattedContent,
+          jobDescription: jobDescription.trim()
         }),
-        // 岗位匹配评估（如果有岗位描述）
-        jobDescription ? fetch('/api/job_evaluation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            resumeContent: formattedContent,
-            jobDescription: jobDescription.trim()
-          }),
-        }) : Promise.resolve(null)
-      ]);
+      }) : Promise.resolve(null);
+
+      // 等待简历分析完成
+      const resumeEvalResponse = await resumeEvalPromise;
+      
+      // 第二步完成
+      updateStepStatus('analyze', 'completed');
+      await delay(400);
+      
+      // 更新第三步状态
+      updateStepStatus('match', 'loading');
+      await delay(800);
+
+      // 等待岗位匹配评估完成
+      const jobEvalResponse = await jobEvalPromise;
 
       // 检查响应状态
       if (!resumeEvalResponse.ok) {
@@ -297,7 +378,6 @@ const JobEvaluation = () => {
       
       if (resumeResult.data) {
         try {
-          // 如果data已经是解析好的JSON对象
           const parsedData = typeof resumeResult.data === 'string' 
             ? JSON.parse(resumeResult.data) 
             : resumeResult.data;
@@ -319,13 +399,20 @@ const JobEvaluation = () => {
         }
       }
 
+      // 第三步完成
+      updateStepStatus('match', 'completed');
+      await delay(400);
+      
+      // 更新第四步状态
+      updateStepStatus('generate', 'loading');
+      await delay(800);
+
       // 处理岗位匹配评估结果
       let jobEvaluation: EvaluationResult | null = null;
       if (jobEvalResponse) {
         const jobResult = await jobEvalResponse.json();
         if (jobResult.data) {
           try {
-            // 如果data已经是解析好的JSON对象
             const parsedData = typeof jobResult.data === 'string' 
               ? JSON.parse(jobResult.data) 
               : jobResult.data;
@@ -352,21 +439,25 @@ const JobEvaluation = () => {
         resumeEvaluation,
         jobEvaluation
       });
+
+      // 第四步完成
+      updateStepStatus('generate', 'completed');
+      await delay(400);
       
       toast.success('评估完成！');
 
     } catch (err: any) {
+      // 发生错误时，将当前步骤标记为错误状态
+      const currentStep = analysisSteps.find(step => step.status === 'loading');
+      if (currentStep) {
+        updateStepStatus(currentStep.id, 'error');
+      }
+
       const errorMessage = err.message || '评测过程中发生错误';
-      console.error('评估错误:', {
-        message: errorMessage,
-        error: err,
-        stack: err.stack
-      });
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
-      console.log('评估流程结束');
     }
   };
 
@@ -666,6 +757,64 @@ const JobEvaluation = () => {
           </motion.div>
         )}
       </div>
+
+      {/* 分析步骤指示器 */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
+        >
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2">
+              <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+              <span>正在分析中...</span>
+            </h3>
+            
+            <div className="space-y-6">
+              {analysisSteps.map((step, index) => (
+                <div key={step.id} className="relative">
+                  {index !== 0 && (
+                    <div className="absolute left-4 -top-6 w-0.5 h-6 bg-gray-200" />
+                  )}
+                  <div className="flex items-start gap-4">
+                    <div className="relative flex-shrink-0 w-8 h-8">
+                      {step.status === 'waiting' && (
+                        <div className="w-8 h-8 rounded-full border-2 border-gray-200 flex items-center justify-center">
+                          <span className="w-2 h-2 rounded-full bg-gray-300" />
+                        </div>
+                      )}
+                      {step.status === 'loading' && (
+                        <div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+                      )}
+                      {step.status === 'completed' && (
+                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <CheckCircle className="w-5 h-5 text-green-600" />
+                        </div>
+                      )}
+                      {step.status === 'error' && (
+                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                          <X className="w-5 h-5 text-red-600" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 pt-1">
+                      <h4 className="text-sm font-medium text-gray-900">{step.title}</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">{step.description}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-500">
+                请耐心等待，分析可能需要一些时间...
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 };

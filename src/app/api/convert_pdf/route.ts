@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     const cozeData = await cozeResponse.json();
     
     if (cozeData.code !== 0) {
+      console.error('Coze API返回错误:', cozeData);
       return NextResponse.json({ 
         error: '转换失败',
         details: cozeData.msg 
@@ -59,7 +60,34 @@ export async function POST(request: Request) {
     }
 
     // 解析返回的数据
-    const outputData = JSON.parse(cozeData.data);
+    let outputData;
+    try {
+      outputData = JSON.parse(cozeData.data);
+    } catch (error) {
+      console.error('JSON解析错误:', error);
+      return NextResponse.json({ 
+        error: '数据格式错误',
+        details: '无法解析返回的数据'
+      }, { status: 500 });
+    }
+
+    // 验证输出数据
+    if (!outputData || !outputData.output || typeof outputData.output !== 'string') {
+      console.error('无效的输出数据:', outputData);
+      return NextResponse.json({ 
+        error: '无效的输出数据',
+        details: '转换结果格式不正确'
+      }, { status: 500 });
+    }
+
+    // 确保输出不为空
+    if (outputData.output.trim() === '') {
+      console.error('空的输出内容');
+      return NextResponse.json({ 
+        error: '转换结果为空',
+        details: '未能提取到简历内容'
+      }, { status: 500 });
+    }
     
     return NextResponse.json({ markdown: outputData.output });
   } catch (error) {
